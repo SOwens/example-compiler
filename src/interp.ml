@@ -4,9 +4,9 @@ open SourceAst
 type store_t = Int64.t Strmap.t
 
 let bool_to_int64 (b : bool) : Int64.t = 
-  Int64.of_int (if b then 1 else 0)
+  if b then 1L else 0L
 let int64_to_bool (i : Int64.t) : bool = 
-  if Int64.to_int i = 0 then false else true
+  if Int64.compare i 0L = 0 then false else true
 
 (* Do a primitive operation *)
 let do_op op (n1 : Int64.t) (n2 : Int64.t) : Int64.t = match op with

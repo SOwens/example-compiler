@@ -16,7 +16,7 @@ let rec prop_exp (env : exp Strmap.t) (exp : exp) : exp =
      | (Num n1, (T.Plus, _), Num n2) -> Num (Int64.add n1 n2)
      | (Num n1, (T.Minus, _), Num n2) -> Num (Int64.sub n1 n2)
      | (Num n1, (T.Times, _), Num n2) -> Num (Int64.mul n1 n2)
-     | (Num n1, (T.Div, _), Num n2) when n2 <> Int64.of_int 0 -> Num (Int64.div n1 n2)
+     | (Num n1, (T.Div, _), Num n2) when n2 <> 0L -> Num (Int64.div n1 n2)
      | (Num n1, (T.Lt, _), Num n2) -> Bool (n1 < n2)
      | (Bool b1, (T.And, _), Bool b2) -> Bool (b1 && b2)
      | (Bool b1, (T.Or, _), Bool b2) -> Bool (b1 || b2)
