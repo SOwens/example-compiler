@@ -1,0 +1,61 @@
+A plus +c in front of compiler topics and a +fp in front of functional
+programming ones. Note that this is cumulative, so later files don't list
+topics that have been listed previously.
+
+underlying:
+  +fp Build systems and editors (.merlin, _tags, and Makefile)
+  +fp .ml and .mli files
+  +fp file dependencies
+
+token:
+  +c  Why we want to abstract from strings
+  +fp Regular expression matching, in practice rather than theory
+  +fp Map.Make(String), balanced binary search trees (possibly Okasaki Red-Black trees?)
+  +fp Simple functor application
+  +fp Exceptions and handling
+  +fp functional loops
+  +fp module opening
+
+sourceAst:
+  +c  ASTs
+  +c  recursive decent parsing
+  +fp deriving show
+  +fp datatype and pattern matching
+  +fp module renaming and opening
+  +fp tuples
+
+typeCheck:
+  +c  environments (see Map.Make(String) from tokens)
+  +fp 'or' patterns
+  +fp recursion on trees
+
+frontEnd:
+  +fp command-line processing
+
+interp:
+  +c  booleans as numbers
+  +c  stores, the difference between stores and environments
+  +fp Int64, and generally different numeric types
+
+constProp:
+  +c  constant propagation
+  +c  abstract interpretation (very basic)
+  +fp pattern guards
+
+blockStructure:
+  +c  three address code
+  +c  basic blocks
+  +c  control flow graphs
+  +fp polymorphic data types
+  +fp representing a graph
+  +fp refs, local encapsulation of state
+  +fp nested functions
+  +fp when it's convenient to be imperative
+  +fp records
+
+liveVarAnalysis:
+  +c live variable analysis
+  +c dataflow
+  +c fixed points
+  +fp work lists
+  +fp as patterns

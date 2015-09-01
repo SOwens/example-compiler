@@ -1,0 +1,11 @@
+Add a pass that switches to a numbered identifier representation. Modify subsequent passes.
+
+Add arrays
+
+Add functions
+
+Add parallelism
+
+Add malloc/free
+
+Add new/GC

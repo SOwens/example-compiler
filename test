@@ -1,0 +1,9 @@
+{
+  input x
+  z := 1
+  while (0 < x) {
+    z := (z * x)
+    x := (x - 1)
+  }
+  output z
+}

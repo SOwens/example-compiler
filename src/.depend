@@ -1,0 +1,29 @@
+util.cmo :
+util.cmx :
+tokens.cmo : util.cmo tokens.cmi
+tokens.cmx : util.cmx tokens.cmi
+sourceAst.cmo : util.cmo tokens.cmi sourceAst.cmi
+sourceAst.cmx : util.cmx tokens.cmx sourceAst.cmi
+typeCheck.cmo : util.cmo sourceAst.cmi typeCheck.cmi
+typeCheck.cmx : util.cmx sourceAst.cmx typeCheck.cmi
+frontEnd.cmo : util.cmo typeCheck.cmi tokens.cmi sourceAst.cmi frontEnd.cmi
+frontEnd.cmx : util.cmx typeCheck.cmx tokens.cmx sourceAst.cmx frontEnd.cmi
+constProp.cmo : util.cmo sourceAst.cmi constProp.cmi
+constProp.cmx : util.cmx sourceAst.cmx constProp.cmi
+blockStructure.cmo : util.cmo tokens.cmi sourceAst.cmi blockStructure.cmi
+blockStructure.cmx : util.cmx tokens.cmx sourceAst.cmx blockStructure.cmi
+liveVarAnalysis.cmo : util.cmo blockStructure.cmi liveVarAnalysis.cmi
+liveVarAnalysis.cmx : util.cmx blockStructure.cmx liveVarAnalysis.cmi
+interp.cmo : util.cmo sourceAst.cmi frontEnd.cmi
+interp.cmx : util.cmx sourceAst.cmx frontEnd.cmx
+compile.cmo : util.cmo liveVarAnalysis.cmi frontEnd.cmi constProp.cmi \
+    blockStructure.cmi
+compile.cmx : util.cmx liveVarAnalysis.cmx frontEnd.cmx constProp.cmx \
+    blockStructure.cmx
+tokens.cmi :
+sourceAst.cmi : tokens.cmi
+typeCheck.cmi : util.cmo sourceAst.cmi
+frontEnd.cmi : sourceAst.cmi
+constProp.cmi : util.cmo sourceAst.cmi
+blockStructure.cmi : tokens.cmi sourceAst.cmi
+liveVarAnalysis.cmi : util.cmo blockStructure.cmi
