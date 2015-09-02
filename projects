@@ -2,8 +2,6 @@ Add a pass that switches to a numbered identifier representation. Modify subsequ
 
 Add arrays
 
-Add functions
-
 Add parallelism
 
 Add malloc/free
@@ -11,3 +9,15 @@ Add malloc/free
 Add new/GC
 
 Add loop optimisations (unrolling, invariant code motion, induction variable, ...)
+
+Make relocatable object code
+
+Add exceptions
+
+Add objects
+
+Better register allocation
+
+Instruction scheduling
+
+Generate LLVM, C, or even asm.js
