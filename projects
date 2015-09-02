@@ -9,3 +9,5 @@ Add parallelism
 Add malloc/free
 
 Add new/GC
+
+Add loop optimisations (unrolling, invariant code motion, induction variable, ...)

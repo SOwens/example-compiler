@@ -39,8 +39,12 @@ interp:
 
 constProp:
   +c  constant propagation
+  +c  constant folding
   +c  abstract interpretation (very basic)
   +fp pattern guards
+  +fp state-monad-like programming (not exactly though)
+  +fp option
+  +fp non-structural recursion
 
 blockStructure:
   +c  three address code

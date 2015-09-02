@@ -2,7 +2,7 @@ open Util
 
 let ast = FrontEnd.front_end true;;
 
-let opt_ast = ConstProp.prop_stmts Strmap.empty ast;;
+let (_,opt_ast) = ConstProp.prop_stmts Strmap.empty ast;;
 print_newline ();;
 print_string ([%show: SourceAst.stmt list] opt_ast);;
 print_newline ();;
