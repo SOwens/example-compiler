@@ -69,6 +69,8 @@ let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stm
      | Bool false -> prop_stmts env stmts
      | _ -> 
        let (env1,os1) = prop_loop_body env s1 in
+       (* have to redo the condition, for the sound constants on entry *)
+       let o1 = fold_exp env1 e in
        let (env',stmts') = prop_stmts env1 stmts in
        (env', While (o1, os1, ln) :: stmts'))
   | Ite (e, s1, s2, ln) :: stmts ->
@@ -92,7 +94,7 @@ let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stm
   | Stmts (stmts1, ln) :: stmts ->
     let (env1, os1) = prop_stmts env stmts1 in
     let (env', stmts') = prop_stmts env1 stmts in
-    (env', Stmts (stmts1, ln) :: stmts')
+    (env', Stmts (os1, ln) :: stmts')
 
 and prop_stmt env stmt =
   match prop_stmts env [stmt] with
