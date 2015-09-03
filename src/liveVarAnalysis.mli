@@ -9,3 +9,4 @@ type cfg = (SourceAst.id cfg_entry * cfg_annot) list
 
 val lva : SourceAst.id BlockStructure.cfg -> cfg
 
+val remove_unused_writes : cfg -> cfg

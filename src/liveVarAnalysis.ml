@@ -79,3 +79,46 @@ let lva (cfg : 'reg BlockStructure.cfg) : cfg =
       do_one new_worklist (finished' @ finished)
   in
   do_one (List.rev init_worklist) []
+
+let rec local_remove_unused_writes (live : Strset.t) (elems : SourceAst.id block_elem list) : SourceAst.id block_elem list =
+  match elems with
+  | [] -> []
+  | AssignOp (i, a1, op, a2) :: b ->
+    if Strset.mem i live then
+      AssignOp (i, a1, op, a2) ::
+      local_remove_unused_writes (add_gen a1 (add_gen a2 (Strset.remove i live))) b
+    else
+      local_remove_unused_writes live b
+  | AssignAtom (i, a) :: b ->
+    if Strset.mem i live then
+      AssignAtom (i, a) ::
+      local_remove_unused_writes (add_gen a (Strset.remove i live)) b
+    else
+      local_remove_unused_writes live b
+  | Ld (i, addr) :: b -> 
+    if Strset.mem i live then
+      Ld (i, addr) ::
+      local_remove_unused_writes (Strset.remove i live) b
+    else
+      local_remove_unused_writes live b
+  | St (i, addr) :: b ->
+    St (i, addr) :: local_remove_unused_writes (Strset.add i live) b
+  | In i :: b ->
+    if Strset.mem i live then
+      In i :: local_remove_unused_writes (Strset.remove i live) b
+    else
+      local_remove_unused_writes live b
+  | Out i :: b ->
+    Out i :: local_remove_unused_writes (Strset.add i live) b
+
+
+
+let remove_unused_writes (cfg : cfg) : cfg =
+  List.map 
+    (fun (entry, annot) ->
+       let new_elems = local_remove_unused_writes annot.live_exit (List.rev entry.elems) in
+       ({entry with elems = List.rev new_elems}, annot))
+    cfg
+
+
+

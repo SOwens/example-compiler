@@ -58,8 +58,9 @@ blockStructure:
   +fp records
 
 liveVarAnalysis:
-  +c live variable analysis
-  +c dataflow
-  +c fixed points
+  +c  live variable analysis
+  +c  dataflow
+  +c  fixed points
+  +c  iterating optimisations (removing unused writes improves LVA which allows more unused writes to be removed)
   +fp work lists
   +fp as patterns
