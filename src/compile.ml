@@ -12,14 +12,14 @@ print_newline ();;
 print_string ([%show: SourceAst.id BlockStructure.cfg] cfg);;
 print_newline ();;
 
-let lva_cfg = LiveVarAnalysis.lva cfg;;
+let lva_cfg0 = LiveVarAnalysis.lva cfg;;
 print_newline ();;
-print_string (LiveVarAnalysis.show_cfg lva_cfg);;
+print_string (LiveVarAnalysis.show_cfg lva_cfg0);;
 print_newline ();;
 
-let lva_cfg' = LiveVarAnalysis.remove_unused_writes lva_cfg;;
+let lva_cfg1 = LiveVarAnalysis.remove_unused_writes lva_cfg0;;
 print_newline ();;
-print_string (LiveVarAnalysis.show_cfg lva_cfg');;
+print_string (LiveVarAnalysis.show_cfg lva_cfg1);;
 print_newline ();;
 
 (* Iterate analysis for examples like this:
@@ -37,12 +37,18 @@ output x
 
 *)
 
-let lva_cfg'' = LiveVarAnalysis.lva (List.map fst lva_cfg');;
+let lva_cfg2 = LiveVarAnalysis.lva (List.map fst lva_cfg1);;
 print_newline ();;
-print_string (LiveVarAnalysis.show_cfg lva_cfg'');;
+print_string (LiveVarAnalysis.show_cfg lva_cfg2);;
 print_newline ();;
 
-let lva_cfg''' = LiveVarAnalysis.remove_unused_writes lva_cfg'';;
+let lva_cfg3 = LiveVarAnalysis.remove_unused_writes lva_cfg2;;
 print_newline ();;
-print_string (LiveVarAnalysis.show_cfg lva_cfg''');;
+print_string (LiveVarAnalysis.show_cfg lva_cfg3);;
 print_newline ();;
+
+let lva_cfg4 = LiveVarAnalysis.lva (List.map fst lva_cfg3);;
+print_newline ();;
+print_string (LiveVarAnalysis.show_cfg lva_cfg4);;
+print_newline ();;
+
