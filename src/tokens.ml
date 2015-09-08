@@ -17,6 +17,8 @@ type op =
   | Eq
   | And
   | Or
+  | Lshift
+  | BitOr
       [@@deriving show]
 
 type token = 
@@ -45,7 +47,8 @@ let keywords =
   [("while",While); ("if",If); ("then",Then); ("else",Else); (":=",Assign);
    ("true",True); ("input", Input); ("output",Output); ("false",False);
    ("+", Op Plus); ("-", Op Minus); ("*", Op Times); ("/", Op Div);
-   ("<", Op Lt); ("=", Op Eq); ("&&", Op And); ("||", Op Or);]
+   ("<", Op Lt); ("=", Op Eq); ("&&", Op And); ("||", Op Or); 
+   ("<<", Op Lshift); ("|", Op BitOr)]
 
 (* Map each keyword string to its corresponding token *)
 let keyword_map : token Strmap.t =

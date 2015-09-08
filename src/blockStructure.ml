@@ -8,15 +8,12 @@ type 'reg atomic_exp =
   | Bool of bool
         [@@deriving show]
 
-type address = int
-    [@@deriving show]
-
 (* A single entry in a basic bloc *)
 type 'reg block_elem = 
   | AssignOp of 'reg * 'reg atomic_exp * Tokens.op * 'reg atomic_exp
   | AssignAtom of 'reg * 'reg atomic_exp
-  | Ld of 'reg * address
-  | St of 'reg * address
+  | Ld of 'reg * 'reg atomic_exp
+  | St of 'reg * 'reg atomic_exp
   | In of 'reg
   | Out of 'reg
         [@@deriving show]
@@ -73,7 +70,7 @@ let exp_to_atomic (e : S.exp) : S.id atomic_exp * S.id basic_block =
 let exp_to_atomic_test (e : S.exp) : S.id * S.id basic_block =
   match exp_to_atomic e with
   | (Ident i, stmts) -> (i, stmts)
-  | _ -> raise (InternalError "exp_to_atomic")
+  | ((Num _ | Bool _), _) -> raise (InternalError "exp_to_atomic")
 
 (* Build the control-flow graph *)
 let build_cfg (stmts : S.stmt list) : S.id cfg =

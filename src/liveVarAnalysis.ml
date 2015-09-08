@@ -111,14 +111,9 @@ let rec local_remove_unused_writes (live : Strset.t) (elems : SourceAst.id block
   | Out i :: b ->
     Out i :: local_remove_unused_writes (Strset.add i live) b
 
-
-
 let remove_unused_writes (cfg : cfg) : cfg =
   List.map 
     (fun (entry, annot) ->
        let new_elems = local_remove_unused_writes annot.live_exit (List.rev entry.elems) in
        ({entry with elems = List.rev new_elems}, annot))
     cfg
-
-
-

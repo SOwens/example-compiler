@@ -22,6 +22,8 @@ let rec fold_exp (env : exp Strmap.t) (exp : exp) : exp =
      | (Bool b1, (T.Or, _), Bool b2) -> Bool (b1 || b2)
      | (Bool b1, (T.Eq, _), Bool b2) -> Bool (b1 = b2)
      | (Num n1, (T.Eq, _), Num n2) -> Bool (Int64.compare n1 n2 = 0)
+     | (Num n1, (T.Lshift, _), Num n2) -> Num (Int64.shift_left n1 (Int64.to_int n2))
+     | (Num n1, (T.BitOr, _), Num n2) -> Num (Int64.logor n1 n2)
      | _ -> Oper (o1, op, o2))
 
 let is_const (e : exp) : bool =

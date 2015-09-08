@@ -4,14 +4,11 @@ type 'reg atomic_exp =
   | Bool of bool
         [@@deriving show]
 
-type address = int
-    [@@deriving show]
-
 type 'reg block_elem = 
   | AssignOp of 'reg * 'reg atomic_exp * Tokens.op * 'reg atomic_exp
   | AssignAtom of 'reg * 'reg atomic_exp
-  | Ld of 'reg * address
-  | St of 'reg * address
+  | Ld of 'reg * 'reg atomic_exp
+  | St of 'reg * 'reg atomic_exp
   | In of 'reg
   | Out of 'reg
         [@@deriving show]

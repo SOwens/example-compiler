@@ -22,7 +22,7 @@ let rec type_exp (env : env_t) (e : exp) : t =
     let t2 = type_exp env e2 in
     (match (t1, op, t2) with
      | (Tbool, ((T.And | T.Or), _), Tbool) -> Tbool
-     | (Tint, ((T.Plus | T.Minus | T.Times | T.Div), _), Tint) -> Tint
+     | (Tint, ((T.Plus | T.Minus | T.Times | T.Div | T.Lshift | T.BitOr), _), Tint) -> Tint
      | (Tint, ((T.Lt | T.Eq), _), Tint) -> Tbool
      | (_, (op, ln), _) -> 
        raise (BadInput ("Type error on operator " ^ T.show_op op ^

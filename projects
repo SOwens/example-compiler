@@ -21,3 +21,7 @@ Better register allocation
 Instruction scheduling
 
 Generate LLVM, C, or even asm.js
+
+Target ARMv8
+
+Add function inlining

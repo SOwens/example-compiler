@@ -7,6 +7,8 @@ type op =
   | Eq
   | And
   | Or
+  | Lshift
+  | BitOr
       [@@deriving show]
 
 type token = 
