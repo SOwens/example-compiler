@@ -18,7 +18,13 @@ let is_imm (a : 'reg atomic_exp) : bool =
 
 let get_large_imm (a : 'reg atomic_exp) : Int64.t option =
   match a with
-  | Num n when Int64.compare (Int64.shift_right n 32) 0L <> 0 -> Some n
+  | Num n ->
+    let topmost = Int64.shift_right n 31 in
+    if Int64.compare topmost 0L = 0 ||
+       Int64.compare topmost 0x1FFFFFFFFL = 0 then
+      None
+    else 
+      Some n
   | _ -> None
 
 let shrink_imm_elem (tmp_reg : 'reg) (e : 'reg block_elem) : 'reg block_elem list =
