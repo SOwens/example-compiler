@@ -21,7 +21,7 @@ let get_large_imm (a : 'reg atomic_exp) : Int64.t option =
   | Num n ->
     let topmost = Int64.shift_right n 31 in
     if Int64.compare topmost 0L = 0 ||
-       Int64.compare topmost 0x1FFFFFFFFL = 0 then
+       Int64.compare topmost 0xFFFFFFFFFFFFFFFFL = 0 then
       None
     else 
       Some n
