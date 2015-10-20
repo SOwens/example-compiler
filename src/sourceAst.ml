@@ -26,7 +26,7 @@ type stmt =
 
 (* Convert the first expression in toks into an AST. Return it with the left
    over tokens *)
-let rec parse_exp (toks : T.tok_loc) : exp * T.tok_loc = 
+let rec parse_exp (toks : T.tok_loc list) : exp * T.tok_loc list = 
   match toks with
   | [] -> raise (BadInput "End of file while parsing an expression")
   | (T.Ident i, ln) :: toks -> (Ident (i, ln), toks)
@@ -46,7 +46,7 @@ let rec parse_exp (toks : T.tok_loc) : exp * T.tok_loc =
 
 (* Convert the first statement in toks into an AST. Return it with the left
    over tokens *)
-let rec parse_stmt (toks : T.tok_loc) : stmt * T.tok_loc =
+let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list=
   match toks with
   | [] -> raise (BadInput "End of file while parsing a statement")
   | (T.Input, ln) :: (T.Ident x, _) :: toks -> (In (x, ln), toks)
@@ -75,7 +75,7 @@ let rec parse_stmt (toks : T.tok_loc) : stmt * T.tok_loc =
 
 (* Convert all of the statement in toks into an AST. Return them with the left
    over tokens *)
-and parse_stmt_list (toks : T.tok_loc) : stmt list * T.tok_loc =
+and parse_stmt_list (toks : T.tok_loc list) : stmt list * T.tok_loc list =
   match toks with
   | ((T.Rcurly, _) :: toks') -> ([], toks')
   | _ ->
@@ -85,7 +85,7 @@ and parse_stmt_list (toks : T.tok_loc) : stmt list * T.tok_loc =
 
 (* Repeatedly parse statments until the input is empty *)
 (* NB, the difference between parse_stmt_list which can leave leftover tokens *) 
-let rec parse_program (toks : T.tok_loc) : stmt list = 
+let rec parse_program (toks : T.tok_loc list) : stmt list = 
   match toks with
   | [] -> []
   | _ ->

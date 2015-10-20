@@ -40,7 +40,7 @@ type token =
   | Output
       [@@deriving show]
 
-type tok_loc = (token * int) list
+type tok_loc = (token * int)
     [@@ deriving show]
 
 let keywords = 
@@ -64,7 +64,7 @@ let brackets_map : token Strmap.t =
 (* Read all the tokens from s, using pos to index into the string and line_n
    to track the current line number, but error reporting later on. Return them
    in a list. *)
-let rec lex (s : string) (pos : int) (line_n : int) : tok_loc = 
+let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list = 
   if pos >= String.length s then
     []
   else if Str.string_match space_re s pos then

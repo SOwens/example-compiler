@@ -30,7 +30,7 @@ type token =
   | Output
       [@@deriving show]
 
-type tok_loc = (token * int) list
+type tok_loc = (token * int)
     [@@deriving show]
 
-val lex : string -> int -> int -> (token * int) list
+val lex : string -> int -> int -> tok_loc list

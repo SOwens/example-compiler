@@ -49,8 +49,10 @@ let rec interp_stmt (store : store_t) (s : stmt) : store_t = match s with
     interp_stmts store sl
   | In (i, _) ->
     Printf.printf "> ";
-    let n = Int64.of_string (read_line ()) in
-      Strmap.add i n store
+    (try
+       let n = Int64.of_string (read_line ()) in
+       Strmap.add i n store
+     with Failure _ -> raise (BadInput "not a 64-bit integer"))
   | Out (i, _) ->
     begin
       print_string (Int64.to_string (Strmap.find i store));

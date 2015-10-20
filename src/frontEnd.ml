@@ -10,7 +10,7 @@ let front_end (print_intermediates : bool) : SourceAst.stmt list =
   let filename = Sys.argv.(1) in
   let input = Std.input_file filename in
   let toks = Tokens.lex input 0 1 in
-  p (Tokens.show_tok_loc toks);
+  p ([%show: Tokens.tok_loc list] toks);
   let ast = SourceAst.parse_program toks in
   p ([%show: SourceAst.stmt list] ast);
   TypeCheck.type_stmts Strmap.empty ast;
