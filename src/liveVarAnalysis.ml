@@ -1,40 +1,40 @@
 open Util
 open BlockStructure
 
-type cfg_annot = { gen : Intset.t; kill : Intset.t; live_exit : Intset.t }
+type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }
     [@@deriving show]
 
-type cfg = (int cfg_entry * cfg_annot) list
+type cfg = (cfg_entry * cfg_annot) list
     [@@deriving show]
 
 (* Add the assigned identifier in a to the generation set *)
-let add_gen (a : int atomic_exp) (gen : Intset.t) : Intset.t =
+let add_gen (a : atomic_exp) (gen : Varset.t) : Varset.t =
   match a with
   | Bool _ | Num _ -> gen
-  | Ident i -> Intset.add i gen
+  | Ident i -> Varset.add i gen
 
 (* Compute the gen and kill sets for a basic block, live_exit is set to empty *)
-let analyse_block (b : int basic_block) : cfg_annot =
+let analyse_block (b : basic_block) : cfg_annot =
   let rec analyse_block gen kill b =
     match b with 
     | [] -> (gen, kill)
     | AssignOp (i, a1, op, a2) :: b ->
-      analyse_block (add_gen a1 (add_gen a2 (Intset.remove i gen))) 
-        (Intset.add i kill) 
+      analyse_block (add_gen a1 (add_gen a2 (Varset.remove i gen))) 
+        (Varset.add i kill) 
         b
     | AssignAtom (i, a) :: b ->
-      analyse_block (add_gen a (Intset.remove i gen)) (Intset.add i kill) b
+      analyse_block (add_gen a (Varset.remove i gen)) (Varset.add i kill) b
     | Ld (i, addr) :: b -> 
-      analyse_block (Intset.remove i gen) (Intset.add i kill) b
+      analyse_block (Varset.remove i gen) (Varset.add i kill) b
     | St (i, addr) :: b ->
-      analyse_block (Intset.add i gen) kill b
+      analyse_block (Varset.add i gen) kill b
     | In i :: b ->
-      analyse_block (Intset.remove i gen) (Intset.add i kill) b
+      analyse_block (Varset.remove i gen) (Varset.add i kill) b
     | Out i :: b ->
-      analyse_block (Intset.add i gen) kill b
+      analyse_block (Varset.add i gen) kill b
   in
-  let (gen,kill) = analyse_block Intset.empty Intset.empty (List.rev b) in
-  { gen = gen; kill = kill; live_exit = Intset.empty }
+  let (gen,kill) = analyse_block Varset.empty Varset.empty (List.rev b) in
+  { gen = gen; kill = kill; live_exit = Varset.empty }
 
 (* Split the annotated cfg into the predecessors of node n, and the other nodes *)
 let rec find_preds n cfg =
@@ -49,7 +49,7 @@ let rec find_preds n cfg =
     cfg
 
 (* Do live variable analysis, returning an annotated cfg *)
-let lva (cfg : 'reg BlockStructure.cfg) : cfg =
+let lva (cfg : BlockStructure.cfg) : cfg =
   (* Initial annotations for all of the blocks *)
   let init_worklist = 
     List.map (fun entry -> (entry, analyse_block entry.elems)) cfg 
@@ -60,18 +60,18 @@ let lva (cfg : 'reg BlockStructure.cfg) : cfg =
     match worklist with
     | [] -> finished_list
     | ((entry, annot) as node) :: worklist ->
-      let live_entry = Intset.union annot.gen (Intset.diff annot.live_exit annot.kill) in
+      let live_entry = Varset.union annot.gen (Varset.diff annot.live_exit annot.kill) in
       let (updates, worklist) = find_preds entry.index worklist in
       let (possible_updates, finished) = find_preds entry.index (node::finished_list) in
       let (finished', updates') =
         List.partition
-          (fun (entry, annot) -> Intset.subset live_entry annot.live_exit)
+          (fun (entry, annot) -> Varset.subset live_entry annot.live_exit)
           possible_updates
       in
       let new_worklist = 
         List.map 
           (fun (entry, annot) ->
-             (entry, { annot with live_exit = Intset.union annot.live_exit live_entry}))
+             (entry, { annot with live_exit = Varset.union annot.live_exit live_entry}))
           (updates @ updates')
         @ 
         worklist
@@ -80,36 +80,36 @@ let lva (cfg : 'reg BlockStructure.cfg) : cfg =
   in
   do_one (List.rev init_worklist) []
 
-let rec local_remove_unused_writes (live : Intset.t) (elems : int block_elem list) : int block_elem list =
+let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list) : block_elem list =
   match elems with
   | [] -> []
   | AssignOp (i, a1, op, a2) :: b ->
-    if Intset.mem i live then
+    if Varset.mem i live then
       AssignOp (i, a1, op, a2) ::
-      local_remove_unused_writes (add_gen a1 (add_gen a2 (Intset.remove i live))) b
+      local_remove_unused_writes (add_gen a1 (add_gen a2 (Varset.remove i live))) b
     else
       local_remove_unused_writes live b
   | AssignAtom (i, a) :: b ->
-    if Intset.mem i live then
+    if Varset.mem i live then
       AssignAtom (i, a) ::
-      local_remove_unused_writes (add_gen a (Intset.remove i live)) b
+      local_remove_unused_writes (add_gen a (Varset.remove i live)) b
     else
       local_remove_unused_writes live b
   | Ld (i, addr) :: b -> 
-    if Intset.mem i live then
+    if Varset.mem i live then
       Ld (i, addr) ::
-      local_remove_unused_writes (Intset.remove i live) b
+      local_remove_unused_writes (Varset.remove i live) b
     else
       local_remove_unused_writes live b
   | St (i, addr) :: b ->
-    St (i, addr) :: local_remove_unused_writes (Intset.add i live) b
+    St (i, addr) :: local_remove_unused_writes (Varset.add i live) b
   | In i :: b ->
-    if Intset.mem i live then
-      In i :: local_remove_unused_writes (Intset.remove i live) b
+    if Varset.mem i live then
+      In i :: local_remove_unused_writes (Varset.remove i live) b
     else
       local_remove_unused_writes live b
   | Out i :: b ->
-    Out i :: local_remove_unused_writes (Intset.add i live) b
+    Out i :: local_remove_unused_writes (Varset.add i live) b
 
 let remove_unused_writes (cfg : cfg) : cfg =
   List.map 

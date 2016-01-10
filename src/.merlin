@@ -1,2 +1,2 @@
-PKG extlib ppx_deriving.show ppx_monadic
+PKG extlib ppx_deriving.show ppx_monadic ppx_deriving.ord
 B _build

@@ -6,17 +6,17 @@ open BlockStructure
 
 (* Build a series of assignments that puts the immediate n into the dest register, using
    only immediates of 32 bits or smaller *)
-let assign_imm (dest : 'reg) (n : Int64.t) : 'reg block_elem list =
+let assign_imm (dest : var) (n : Int64.t) : block_elem list =
   [AssignAtom (dest, Num (Int64.shift_right_logical n 32));
    AssignOp (dest, Ident dest, Tokens.Lshift, Num 32L);
    AssignOp (dest, Ident dest, Tokens.BitOr, Num (Int64.logand n 0x00000000FFFFFFFFL))]
 
-let is_imm (a : 'reg atomic_exp) : bool =
+let is_imm (a : atomic_exp) : bool =
   match a with
   | Ident _ -> false
   | Num _ | Bool _ -> true
 
-let get_large_imm (a : 'reg atomic_exp) : Int64.t option =
+let get_large_imm (a : atomic_exp) : Int64.t option =
   match a with
   | Num n ->
     let topmost = Int64.shift_right n 31 in
@@ -27,7 +27,7 @@ let get_large_imm (a : 'reg atomic_exp) : Int64.t option =
       Some n
   | _ -> None
 
-let shrink_imm_elem (tmp_reg : 'reg) (e : 'reg block_elem) : 'reg block_elem list =
+let shrink_imm_elem (tmp_reg : var) (e : block_elem) : block_elem list =
   match e with
   | AssignOp (dest, a1, op, a2) ->
     assert (not (is_imm a1 && is_imm a2));
@@ -57,8 +57,8 @@ let shrink_imm_elem (tmp_reg : 'reg) (e : 'reg block_elem) : 'reg block_elem lis
   | In r -> [e]
   | Out r -> [e]
 
-let shrink_imm (cfg : string cfg) : string cfg =
+let shrink_imm (cfg : cfg) : cfg =
   List.map 
     (fun cfg_entry ->
-       { cfg_entry with elems = List.flatten (List.map (shrink_imm_elem "__tmp") cfg_entry.elems) })
+       { cfg_entry with elems = List.flatten (List.map (shrink_imm_elem (NamedTmp 0)) cfg_entry.elems) })
     cfg

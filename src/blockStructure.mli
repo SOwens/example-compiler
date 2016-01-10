@@ -1,32 +1,49 @@
-type 'reg atomic_exp =
-  | Ident of 'reg
+type var =
+  | Vreg of int
+  | Stack of int
+  | NamedSource of string
+  | NamedTmp of int
+        [@@deriving show]
+
+module Varset : sig
+  include Set.S with type elt = var
+  val show : t -> string
+  val pp : Format.formatter -> t -> unit
+end
+
+module Varmap : sig
+  include Map.S with type key = var
+end
+
+type atomic_exp =
+  | Ident of var
   | Num of Int64.t
   | Bool of bool
         [@@deriving show]
 
-type 'reg block_elem = 
-  | AssignOp of 'reg * 'reg atomic_exp * Tokens.op * 'reg atomic_exp
-  | AssignAtom of 'reg * 'reg atomic_exp
-  | Ld of 'reg * 'reg atomic_exp
-  | St of 'reg * 'reg atomic_exp
-  | In of 'reg
-  | Out of 'reg
+type block_elem = 
+  | AssignOp of var * atomic_exp * Tokens.op * atomic_exp
+  | AssignAtom of var * atomic_exp
+  | Ld of var * atomic_exp
+  | St of var * atomic_exp
+  | In of var
+  | Out of var
         [@@deriving show]
 
-type 'reg basic_block = 'reg block_elem list
+type basic_block = block_elem list
     [@@deriving show]
 
-type 'reg next_block = 
+type next_block = 
   | End
   | Next of int
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
-  | Branch of 'reg * int * int
+  | Branch of var * int * int
                 [@@deriving show]
 
-type 'reg cfg_entry = { index : int; elems : 'reg block_elem list; next : 'reg next_block }
+type cfg_entry = { index : int; elems : block_elem list; next : next_block }
     [@@deriving show]
-type 'reg cfg = 'reg cfg_entry list
+type cfg = cfg_entry list
     [@@deriving show]
 
-val build_cfg : SourceAst.stmt list -> SourceAst.id cfg
+val build_cfg : SourceAst.stmt list -> cfg

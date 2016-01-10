@@ -9,17 +9,17 @@ print_newline ();;
 
 let cfg = BlockStructure.build_cfg opt_ast;;
 print_newline ();;
-print_string ([%show: SourceAst.id BlockStructure.cfg] cfg);;
+print_string ([%show: BlockStructure.cfg] cfg);;
 print_newline ();;
 
 let cfg' = ShrinkImmediates.shrink_imm cfg;;
 print_newline ();;
-print_string ([%show: SourceAst.id BlockStructure.cfg] cfg');;
+print_string ([%show: BlockStructure.cfg] cfg');;
 print_newline ();;
 
-let cfg'' = RegAlloc.alloc_local_vars_cfg cfg';;
+let cfg'' = IntroVreg.intro_vreg cfg';;
 print_newline ();;
-print_string ([%show: int BlockStructure.cfg] cfg'');;
+print_string ([%show: BlockStructure.cfg] cfg'');;
 print_newline ();;
 
 let lva_cfg0 = LiveVarAnalysis.lva cfg'';;
