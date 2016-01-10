@@ -16,8 +16,8 @@ shrinkImmediates.cmo : tokens.cmi blockStructure.cmi shrinkImmediates.cmi
 shrinkImmediates.cmx : tokens.cmx blockStructure.cmx shrinkImmediates.cmi
 liveVarAnalysis.cmo : util.cmo blockStructure.cmi liveVarAnalysis.cmi
 liveVarAnalysis.cmx : util.cmx blockStructure.cmx liveVarAnalysis.cmi
-introVreg.cmo : util.cmo sourceAst.cmi blockStructure.cmi introVreg.cmi
-introVreg.cmx : util.cmx sourceAst.cmx blockStructure.cmx introVreg.cmi
+introVreg.cmo : util.cmo blockStructure.cmi introVreg.cmi
+introVreg.cmx : util.cmx blockStructure.cmx introVreg.cmi
 interp.cmo : util.cmo sourceAst.cmi frontEnd.cmi
 interp.cmx : util.cmx sourceAst.cmx frontEnd.cmx
 compile.cmo : util.cmo shrinkImmediates.cmi liveVarAnalysis.cmi \
