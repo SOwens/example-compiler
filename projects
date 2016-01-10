@@ -25,3 +25,5 @@ Generate LLVM, C, or even asm.js
 Target ARMv8
 
 Add function inlining
+
+Shrink the stack frames
