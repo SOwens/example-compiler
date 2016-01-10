@@ -12,18 +12,28 @@ constProp.cmo : util.cmo sourceAst.cmi constProp.cmi
 constProp.cmx : util.cmx sourceAst.cmx constProp.cmi
 blockStructure.cmo : util.cmo tokens.cmi sourceAst.cmi blockStructure.cmi
 blockStructure.cmx : util.cmx tokens.cmx sourceAst.cmx blockStructure.cmi
-liveVarAnalysis.cmo : util.cmo blockStructure.cmi liveVarAnalysis.cmi
-liveVarAnalysis.cmx : util.cmx blockStructure.cmx liveVarAnalysis.cmi
+shrinkImmediates.cmo : tokens.cmi blockStructure.cmi shrinkImmediates.cmi
+shrinkImmediates.cmx : tokens.cmx blockStructure.cmx shrinkImmediates.cmi
+liveVarAnalysis.cmo : util.cmo sourceAst.cmi blockStructure.cmi \
+    liveVarAnalysis.cmi
+liveVarAnalysis.cmx : util.cmx sourceAst.cmx blockStructure.cmx \
+    liveVarAnalysis.cmi
+regAlloc.cmo : util.cmo sourceAst.cmi blockStructure.cmi regAlloc.cmi
+regAlloc.cmx : util.cmx sourceAst.cmx blockStructure.cmx regAlloc.cmi
 interp.cmo : util.cmo sourceAst.cmi frontEnd.cmi
 interp.cmx : util.cmx sourceAst.cmx frontEnd.cmx
-compile.cmo : util.cmo liveVarAnalysis.cmi frontEnd.cmi constProp.cmi \
-    blockStructure.cmi
-compile.cmx : util.cmx liveVarAnalysis.cmx frontEnd.cmx constProp.cmx \
-    blockStructure.cmx
+compile.cmo : util.cmo shrinkImmediates.cmi regAlloc.cmi liveVarAnalysis.cmi \
+    frontEnd.cmi constProp.cmi blockStructure.cmi
+compile.cmx : util.cmx shrinkImmediates.cmx regAlloc.cmx liveVarAnalysis.cmx \
+    frontEnd.cmx constProp.cmx blockStructure.cmx
+pretty.cmo : util.cmo tokens.cmi sourceAst.cmi
+pretty.cmx : util.cmx tokens.cmx sourceAst.cmx
 tokens.cmi :
 sourceAst.cmi : tokens.cmi
 typeCheck.cmi : util.cmo sourceAst.cmi
 frontEnd.cmi : sourceAst.cmi
 constProp.cmi : util.cmo sourceAst.cmi
 blockStructure.cmi : tokens.cmi sourceAst.cmi
-liveVarAnalysis.cmi : util.cmo blockStructure.cmi
+shrinkImmediates.cmi : blockStructure.cmi
+liveVarAnalysis.cmi : util.cmo sourceAst.cmi blockStructure.cmi
+regAlloc.cmi : sourceAst.cmi blockStructure.cmi

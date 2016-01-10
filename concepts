@@ -64,3 +64,6 @@ liveVarAnalysis:
   +c  iterating optimisations (removing unused writes improves LVA which allows more unused writes to be removed)
   +fp work lists
   +fp as patterns
+
+regAlloc:
+  +fp state monads
