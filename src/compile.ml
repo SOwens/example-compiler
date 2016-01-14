@@ -17,12 +17,7 @@ print_newline ();;
 print_string ([%show: BlockStructure.cfg] cfg');;
 print_newline ();;
 
-let cfg'' = IntroVreg.intro_vreg cfg';;
-print_newline ();;
-print_string ([%show: BlockStructure.cfg] cfg'');;
-print_newline ();;
-
-let lva_cfg0 = LiveVarAnalysis.lva cfg'';;
+let lva_cfg0 = LiveVarAnalysis.lva cfg';;
 print_newline ();;
 print_string (LiveVarAnalysis.show_cfg lva_cfg0);;
 print_newline ();;
