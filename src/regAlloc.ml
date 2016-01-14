@@ -68,7 +68,6 @@ let sequence_ (l : unit M.t list) : unit M.t =
 let mapM_ (f : 'a -> unit M.t) (al : 'a list) : unit M.t = 
   sequence_ (List.map f al)
 
-
 let count_vars_ae (ae : atomic_exp) : unit M.t =
   match ae with
   | Ident r -> 
@@ -133,3 +132,42 @@ let count_vars (cfg : cfg) : int Varmap.t =
     return map
   in
   M.run m
+
+let reg_alloc_ae (map : var Varmap.t) (ae : atomic_exp) : atomic_exp =
+  match ae with
+  | Ident v -> 
+    Ident (Varmap.find v map)
+  | Num x -> Num x
+  | Bool b -> Bool b
+
+let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
+  match be with
+  | AssignOp (v, ae1, op, ae2) ->
+    AssignOp (Varmap.find v map, reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)
+  | AssignAtom (v, ae) ->
+    AssignAtom (Varmap.find v map, reg_alloc_ae map ae)
+  | Ld (v, ae) ->
+    Ld (Varmap.find v map, reg_alloc_ae map ae)
+  | St (v, ae) ->
+    St (Varmap.find v map, reg_alloc_ae map ae)
+  | In v ->
+    In (Varmap.find v map)
+  | Out v ->
+    Out (Varmap.find v map)
+
+let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
+  match nb with
+  | End -> End
+  | Next i -> Next i
+  | Branch (v, t1, t2) ->
+    Branch (Varmap.find v map, t1, t2)
+
+(*
+let reg_alloc (num_regs : int) (cfg : cfg) : cfg =
+  let counts = count_vars cfg in
+  let counts_list = Varmap.bindings counts in
+  let sorted_counts_list = 
+    List.map fst (List.sort (fun (_, x) (_, y) -> compare x y) counts_list)
+  in
+  List.map (reg_alloc_nb Varmap.empty) cfg
+   *)
