@@ -61,8 +61,8 @@ let lva (cfg : BlockStructure.cfg) : cfg =
     | [] -> finished_list
     | ((entry, annot) as node) :: worklist ->
       let live_entry = Varset.union annot.gen (Varset.diff annot.live_exit annot.kill) in
-      let (updates, worklist) = find_preds entry.index worklist in
-      let (possible_updates, finished) = find_preds entry.index (node::finished_list) in
+      let (updates, worklist) = find_preds entry.bnum worklist in
+      let (possible_updates, finished) = find_preds entry.bnum (node::finished_list) in
       let (finished', updates') =
         List.partition
           (fun (entry, annot) -> Varset.subset live_entry annot.live_exit)

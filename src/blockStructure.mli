@@ -41,7 +41,7 @@ type next_block =
   | Branch of var * int * int
                 [@@deriving show]
 
-type cfg_entry = { index : int; elems : block_elem list; next : next_block }
+type cfg_entry = { bnum : int; elems : block_elem list; next : next_block }
     [@@deriving show]
 type cfg = cfg_entry list
     [@@deriving show]

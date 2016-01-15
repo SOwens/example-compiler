@@ -124,8 +124,8 @@ let count_vars (cfg : cfg) : int Varmap.t =
     () <-- mapM_
       (fun e ->
          M.do_ ;
-         new_elems <-- mapM count_vars_be e.elems;
-         new_next <-- count_vars_nb e.next;
+         () <-- mapM_ count_vars_be e.elems;
+         () <-- count_vars_nb e.next;
          return ())
       cfg;
     map <-- M.get_counts;
@@ -162,12 +162,17 @@ let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
   | Branch (v, t1, t2) ->
     Branch (Varmap.find v map, t1, t2)
 
-(*
 let reg_alloc (num_regs : int) (cfg : cfg) : cfg =
   let counts = count_vars cfg in
   let counts_list = Varmap.bindings counts in
   let sorted_counts_list = 
-    List.map fst (List.sort (fun (_, x) (_, y) -> compare x y) counts_list)
+    List.map fst (List.sort (fun (_, x) (_, y) -> compare y x) counts_list)
   in
-  List.map (reg_alloc_nb Varmap.empty) cfg
-   *)
+  let (in_regs,on_stack) = ExtLib.List.split_nth num_regs sorted_counts_list in
+  let reg_nums = List.map (fun x -> Vreg x) (count num_regs) in
+  let stack_nums = List.map (fun x -> Stack x) (count (List.length sorted_counts_list - num_regs)) in
+  let alloc_list = zip in_regs reg_nums @ zip on_stack stack_nums in
+  let map = List.fold_right (fun (k,v) m -> Varmap.add k v m) alloc_list Varmap.empty in
+  List.map (fun entry -> { bnum = entry.bnum; 
+                           elems = List.map (reg_alloc_be map) entry.elems; 
+                           next = reg_alloc_nb map entry.next }) cfg

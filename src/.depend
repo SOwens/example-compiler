@@ -20,10 +20,10 @@ regAlloc.cmo : util.cmo blockStructure.cmi regAlloc.cmi
 regAlloc.cmx : util.cmx blockStructure.cmx regAlloc.cmi
 interp.cmo : util.cmo sourceAst.cmi frontEnd.cmi
 interp.cmx : util.cmx sourceAst.cmx frontEnd.cmx
-compile.cmo : util.cmo shrinkImmediates.cmi liveVarAnalysis.cmi frontEnd.cmi \
-    constProp.cmi blockStructure.cmi
-compile.cmx : util.cmx shrinkImmediates.cmx liveVarAnalysis.cmx frontEnd.cmx \
-    constProp.cmx blockStructure.cmx
+compile.cmo : util.cmo shrinkImmediates.cmi regAlloc.cmi liveVarAnalysis.cmi \
+    frontEnd.cmi constProp.cmi blockStructure.cmi
+compile.cmx : util.cmx shrinkImmediates.cmx regAlloc.cmx liveVarAnalysis.cmx \
+    frontEnd.cmx constProp.cmx blockStructure.cmx
 pretty.cmo : util.cmo tokens.cmi sourceAst.cmi
 pretty.cmx : util.cmx tokens.cmx sourceAst.cmx
 tokens.cmi :

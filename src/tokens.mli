@@ -11,6 +11,8 @@ type op =
   | BitOr
       [@@deriving show]
 
+val op_to_string : op -> string
+
 type token = 
   | Num of Int64.t
   | Ident of string

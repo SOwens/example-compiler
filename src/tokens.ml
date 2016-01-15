@@ -21,6 +21,19 @@ type op =
   | BitOr
       [@@deriving show]
 
+let op_to_string op =
+  match op with
+  | Plus -> "+"
+  | Minus -> "-"
+  | Times -> "*"
+  | Div -> "/"
+  | Lt -> "<"
+  | Eq -> "="
+  | And -> "&&"
+  | Or -> "||"
+  | Lshift -> "<<"
+  | BitOr -> "|"
+
 type token = 
   | Num of Int64.t
   | Ident of string

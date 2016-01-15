@@ -6,7 +6,17 @@ type var =
   | Stack of int
   | NamedSource of string
   | NamedTmp of int
-        [@@deriving show, ord]
+        [@@deriving ord]
+
+let show_var v = 
+  match v with
+  | Vreg i -> "r" ^ string_of_int i
+  | Stack i -> "s" ^ string_of_int i
+  | NamedSource s -> s
+  | NamedTmp i -> "tmp" ^ string_of_int i
+
+let pp_var fmt v = 
+  Format.fprintf fmt "%s" (show_var v)
 
 module VarCmp = struct
   type t = var
@@ -17,8 +27,8 @@ module Varset' = Set.Make(VarCmp)
 
 module Varset = struct
   include Varset'
-  let show s = "Varset.of_list " ^ [%show: var list] (elements s)
-  let pp f s = Format.fprintf f "%s" (show s)
+  let show s = [%show: var list] (elements s)
+  let pp fmt s = Format.fprintf fmt "%a" (pp_set pp_var) (elements s)
 end
 
 module Varmap = Map.Make(VarCmp)
@@ -28,7 +38,16 @@ type atomic_exp =
   | Ident of var
   | Num of Int64.t
   | Bool of bool
-        [@@deriving show]
+
+let show_atomic_exp ae = 
+  match ae with
+  | Ident v -> show_var v
+  | Num i -> [%show: Int64.t] i
+  | Bool true -> "true"
+  | Bool false -> "false"
+
+let pp_atomic_exp fmt ae = 
+  Format.fprintf fmt "%s" (show_atomic_exp ae)
 
 (* A single entry in a basic bloc *)
 type block_elem = 
@@ -38,14 +57,41 @@ type block_elem =
   | St of var * atomic_exp
   | In of var
   | Out of var
-        [@@deriving show]
+    [@@deriving show]
+
+let pp_block_elem fmt be = 
+  match be with
+  | AssignOp (v, ae1, op, ae2) ->
+    Format.fprintf fmt "%a := %a %s %a" 
+      pp_var v
+      pp_atomic_exp ae1
+      (Tokens.op_to_string op)
+      pp_atomic_exp ae2
+  | AssignAtom (v, ae) ->
+    Format.fprintf fmt "%a := %a" 
+      pp_var v
+      pp_atomic_exp ae
+  | Ld (v, ae) ->
+    Format.fprintf fmt "%a := *%a" 
+      pp_var v
+      pp_atomic_exp ae
+  | St (v, ae) ->
+    Format.fprintf fmt "*%a := %a" 
+      pp_var v
+      pp_atomic_exp ae
+  | In v ->
+    Format.fprintf fmt "input %a" 
+      pp_var v
+  | Out v ->
+    Format.fprintf fmt "output %a" 
+      pp_var v
 
 type basic_block = block_elem list
     [@@deriving show]
 
 (* A basic block is either at the end of the program, or there is an
    unconditional jump out of it, or a branch out of it. This type represents
-   the index of the next block in the cfg. *)
+   the block number of the next block in the cfg. *)
 type next_block = 
   | End
   | Next of int
@@ -54,9 +100,26 @@ type next_block =
   | Branch of var * int * int
                 [@@deriving show]
 
+let pp_next_block fmt nb =
+  match nb with
+  | End -> Format.fprintf fmt "END"
+  | Next i -> Format.fprintf fmt "%d" i
+  | Branch (v,i1,i2) -> Format.fprintf fmt "if@ %a@ then@ B%d@ else@ B%d" 
+                          pp_var v
+                          i1
+                          i2
+
 (* An adjacency list representation for the CFG *)
-type cfg_entry = { index : int; elems : block_elem list; next : next_block }
+type cfg_entry =
+  { bnum : int; elems : block_elem list; next : next_block }
     [@@deriving show]
+
+let pp_cfg_entry fmt e =
+  Format.fprintf fmt "@[[B%d:@ %a@ %a]@]"
+    e.bnum
+    (pp_list pp_block_elem) e.elems
+    pp_next_block e.next
+
 type cfg = cfg_entry list
     [@@deriving show]
 
@@ -107,7 +170,7 @@ let build_cfg (stmts : S.stmt list) : cfg =
   (* Store the cfg here as we build it *)
   let the_cfg = ref [] in
   let add_block (num : int) (block : basic_block) (next : next_block) : unit =
-    the_cfg := { index = num; elems = List.rev block; next = next} :: !the_cfg
+    the_cfg := { bnum = num; elems = List.rev block; next = next} :: !the_cfg
   in
 
   (* Convert stmts to basic blocks, and add them to the_cfg. block_num is the
