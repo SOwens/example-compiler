@@ -103,7 +103,7 @@ type next_block =
 let pp_next_block fmt nb =
   match nb with
   | End -> Format.fprintf fmt "END"
-  | Next i -> Format.fprintf fmt "%d" i
+  | Next i -> Format.fprintf fmt "B%d" i
   | Branch (v,i1,i2) -> Format.fprintf fmt "if@ %a@ then@ B%d@ else@ B%d" 
                           pp_var v
                           i1
