@@ -14,7 +14,7 @@ let assign_imm (dest : var) (n : Int64.t) : block_elem list =
 let is_imm (a : atomic_exp) : bool =
   match a with
   | Ident _ -> false
-  | Num _ | Bool _ -> true
+  | Num _ -> true
 
 let get_large_imm (a : atomic_exp) : Int64.t option =
   match a with

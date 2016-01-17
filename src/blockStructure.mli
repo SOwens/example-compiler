@@ -18,7 +18,6 @@ end
 type atomic_exp =
   | Ident of var
   | Num of Int64.t
-  | Bool of bool
         [@@deriving show]
 
 type block_elem = 

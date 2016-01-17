@@ -61,3 +61,5 @@ let reg_cfg = RegAlloc.reg_alloc 2 (List.map fst lva_cfg4);;
 print_newline ();;
 print_string (BlockStructure.show_cfg reg_cfg);;
 print_newline ();;
+
+open X86;;

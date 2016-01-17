@@ -10,7 +10,7 @@ type cfg = (cfg_entry * cfg_annot) list
 (* Add the assigned identifier in a to the generation set *)
 let add_gen (a : atomic_exp) (gen : Varset.t) : Varset.t =
   match a with
-  | Bool _ | Num _ -> gen
+  | Num _ -> gen
   | Ident i -> Varset.add i gen
 
 (* Compute the gen and kill sets for a basic block, live_exit is set to empty *)

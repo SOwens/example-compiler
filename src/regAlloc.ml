@@ -75,7 +75,6 @@ let count_vars_ae (ae : atomic_exp) : unit M.t =
     () <-- M.inc_var r;
     return ()
   | Num x -> M.return ()
-  | Bool b -> M.return ()
 
 let count_vars_be (be : block_elem) : unit M.t =
   match be with
@@ -138,7 +137,6 @@ let reg_alloc_ae (map : var Varmap.t) (ae : atomic_exp) : atomic_exp =
   | Ident v -> 
     Ident (Varmap.find v map)
   | Num x -> Num x
-  | Bool b -> Bool b
 
 let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
   match be with

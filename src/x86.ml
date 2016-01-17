@@ -139,7 +139,7 @@ type instruction =
   | Zxadd      of rm * reg
   | Zxchg      of rm * reg
    *)
-  | Zmul       of rm (* RDX,RAX := RAX * rm *)
+  | Zimul       of rm * rm * Int64.t option
   | Zdiv       of rm (* RAX := RDX,RAX / rm; RDX := RDX,RAX mod rm *)
   | Zlea       of dest_src
   | Zpop       of rm
@@ -163,9 +163,15 @@ let pp_instruction fmt i =
     fprintf fmt "%a %a"
       pp_monop_name n
       pp_rm rm
-  | Zmul rm ->
-    fprintf fmt "mul %a"
-      pp_rm rm
+  | Zimul (rm1, rm2, None) ->
+    fprintf fmt "imul %a, %a"
+      pp_rm rm1
+      pp_rm rm2
+  | Zimul (rm1, rm2, Some i) ->
+    fprintf fmt "imul %a, %a, %s"
+      pp_rm rm1
+      pp_rm rm2
+      ([%show:Int64.t] i)
   | Zdiv rm ->
     fprintf fmt "div %a"
       pp_rm rm
