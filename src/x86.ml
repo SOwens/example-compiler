@@ -139,7 +139,7 @@ type instruction =
   | Zxadd      of rm * reg
   | Zxchg      of rm * reg
    *)
-  | Zimul       of rm * rm * Int64.t option
+  | Zimul      of rm * rm * Int64.t option
   | Zdiv       of rm (* RAX := RDX,RAX / rm; RDX := RDX,RAX mod rm *)
   | Zlea       of dest_src
   | Zpop       of rm

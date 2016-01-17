@@ -20,8 +20,8 @@ regAlloc.cmo : util.cmo blockStructure.cmi regAlloc.cmi
 regAlloc.cmx : util.cmx blockStructure.cmx regAlloc.cmi
 x86.cmo : util.cmo
 x86.cmx : util.cmx
-instrSelX86.cmo :
-instrSelX86.cmx :
+instrSelX86.cmo : x86.cmo tokens.cmi blockStructure.cmi
+instrSelX86.cmx : x86.cmx tokens.cmx blockStructure.cmx
 interp.cmo : util.cmo sourceAst.cmi frontEnd.cmi
 interp.cmx : util.cmx sourceAst.cmx frontEnd.cmx
 compile.cmo : x86.cmo util.cmo shrinkImmediates.cmi regAlloc.cmi \
