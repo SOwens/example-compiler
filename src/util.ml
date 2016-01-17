@@ -31,3 +31,8 @@ let pp_list' d1 d2 pp fmt l =
 
 let pp_list pp = pp_list' "[" "]" pp
 let pp_set pp = pp_list' "{" "}" pp
+
+let option_map f x =
+  match x with
+  | None -> None
+  | Some y -> Some (f y)
