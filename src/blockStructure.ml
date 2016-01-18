@@ -137,6 +137,7 @@ let exp_to_atomic (e : S.exp) : atomic_exp * basic_block =
     match e with
     | S.Ident (i, _) -> (Ident (NamedSource i), [])
     | S.Num i -> (Num i, [])
+    | S.Bool _ -> assert false (* Removed by prior removeBool phase *)
     | S.Oper (e1, (op, _), e2) ->
       let (a1, s1) = do_to_atom e1 in
       let (a2, s2) = do_to_atom e2 in

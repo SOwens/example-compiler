@@ -37,6 +37,9 @@ interp:
   +c  stores, the difference between stores and environments
   +fp Int64, and generally different numeric types
 
+remove-bool:
+  +c  short circuit evaluation
+
 constProp:
   +c  constant propagation
   +c  constant folding

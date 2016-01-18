@@ -7,7 +7,12 @@ print_newline ();;
 print_string ([%show: SourceAst.stmt list] opt_ast);;
 print_newline ();;
 
-let cfg = BlockStructure.build_cfg opt_ast;;
+let no_bool_ast = RemoveBool.remove_and_or opt_ast;;
+print_newline ();;
+print_string ([%show: SourceAst.stmt list] no_bool_ast);;
+print_newline ();;
+
+let cfg = BlockStructure.build_cfg no_bool_ast;;
 print_newline ();;
 print_string ([%show: BlockStructure.cfg] cfg);;
 print_newline ();;
