@@ -173,4 +173,6 @@ let reg_alloc (num_regs : int) (cfg : cfg) : cfg =
   let map = List.fold_right (fun (k,v) m -> Varmap.add k v m) alloc_list Varmap.empty in
   List.map (fun entry -> { bnum = entry.bnum; 
                            elems = List.map (reg_alloc_be map) entry.elems; 
-                           next = reg_alloc_nb map entry.next }) cfg
+                           next = reg_alloc_nb map entry.next;
+                           finished = false;
+                           started = false }) cfg

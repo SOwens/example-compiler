@@ -108,7 +108,8 @@ let pp_next_block fmt nb =
 
 (* An adjacency list representation for the CFG *)
 type cfg_entry =
-  { bnum : int; elems : block_elem list; next : next_block }
+  { bnum : int; elems : block_elem list; next : next_block; 
+    mutable started : bool; mutable finished : bool }
     [@@deriving show]
 
 let pp_cfg_entry fmt e =
@@ -167,7 +168,8 @@ let build_cfg (stmts : S.stmt list) : cfg =
   (* Store the cfg here as we build it *)
   let the_cfg = ref [] in
   let add_block (num : int) (block : basic_block) (next : next_block) : unit =
-    the_cfg := { bnum = num; elems = List.rev block; next = next} :: !the_cfg
+    the_cfg := { bnum = num; elems = List.rev block; next = next; 
+                 started = false; finished = false} :: !the_cfg
   in
 
   (* Convert stmts to basic blocks, and add them to the_cfg. block_num is the
@@ -218,7 +220,7 @@ let build_cfg (stmts : S.stmt list) : cfg =
   in
 
   let end_block_num = get_block_num () in
-  let init_block = get_block_num () in
+  let init_block = get_block_num () in (* Later on we rely on the starting block being #1 *)
   add_block end_block_num [] End;
   find_blocks init_block end_block_num stmts [];
   !the_cfg

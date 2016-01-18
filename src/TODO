@@ -1,3 +1,4 @@
-Instruction selection
-constProp for short circuit && and ||
+Linearise CFG
+Generate asm files that can be linked with libc
+Finish instruction selection
 Make another version of the compiler that includes functions

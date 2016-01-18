@@ -1,4 +1,5 @@
 open Util
+open Format
 
 let ast = FrontEnd.front_end true;;
 
@@ -63,8 +64,10 @@ print_string (LiveVarAnalysis.show_cfg lva_cfg4);;
 print_newline ();;
 
 let reg_cfg = RegAlloc.reg_alloc 2 (List.map fst lva_cfg4);;
-print_newline ();;
-print_string (BlockStructure.show_cfg reg_cfg);;
-print_newline ();;
+printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg;;
+
+let linear = LineariseCfg.cfg_to_linear reg_cfg;;
+printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;;
 
 open X86;;
+open InstrSelX86;;
