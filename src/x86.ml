@@ -30,6 +30,30 @@ let show_reg r =
 let pp_reg fmt r =
   fprintf fmt "%s" (show_reg r)
 
+type byte_reg = B of reg
+
+let show_byte_reg (B r) =
+  match r with
+  | RAX -> "al"
+  | RBX -> "bl"
+  | RCX -> "cl"
+  | RDX -> "dl" 
+  | RSP -> "spl" 
+  | RBP -> "bpl"
+  | RSI -> "sil"
+  | RDI -> "dil"
+  | R8 -> "r8b"
+  | R9 -> "r9b"
+  | R10 -> "r10b"
+  | R11 -> "r11b"
+  | R12 -> "r12b"
+  | R13 -> "r13b"
+  | R14 -> "r14b"
+  | R15 -> "r15b"
+
+let pp_byte_reg fmt r =
+  fprintf fmt "%s" (show_byte_reg r)
+
 type rm = 
   | Zr of reg                                          (* register *)
   | Zm of (int * reg) option * reg option * Int64.t option (* mem[2^{scale} * index + base + displacement] *)
@@ -118,18 +142,25 @@ type cond = (* this list is not complete *)
   | Z_S | Z_NS          (* S = signed  *)
   | Z_A | Z_NA          (* A = above   *)
   | Z_B | Z_NB          (* B = below   *)
+  | Z_L | Z_NL          (* L = less *)
+  | Z_G | Z_NG          (* L = greater *)
 
 let pp_cond fmt c =
-  match c with
-  | Z_ALWAYS -> fprintf fmt "mp"
-  | Z_E -> fprintf fmt "e"
-  | Z_NE -> fprintf fmt "ne"
-  | Z_S -> fprintf fmt "s"
-  | Z_NS -> fprintf fmt "ns"
-  | Z_A -> fprintf fmt "s"
-  | Z_NA -> fprintf fmt "ns"
-  | Z_B -> fprintf fmt "s"
-  | Z_NB -> fprintf fmt "ns"
+  fprintf fmt "%s"
+    (match c with
+     | Z_ALWAYS -> "mp"
+     | Z_E -> "e"
+     | Z_NE -> "ne"
+     | Z_S -> "s"
+     | Z_NS -> "ns"
+     | Z_A -> "a"
+     | Z_NA -> "na"
+     | Z_B -> "b"
+     | Z_NB -> "nb"
+     | Z_L -> "l"
+     | Z_NL -> "nl"
+     | Z_G -> "g"
+     | Z_NG -> "ng")
 
 type instruction = 
   | Zbinop     of binop_name * dest_src
@@ -151,6 +182,9 @@ type instruction =
   (* | Zmovzx     of dest_src *)
   | Zjcc       of cond * string     (* jcc includes jmp rel, i.e. unconditional relative jumps. *)
   | Zjmp       of rm                (* jmp excludes relative jumps, see jcc. *)
+  | Zset       of cond * byte_reg   (* Set operates on a byte of memory or
+                                       register. Here, we'll only use registers
+                                    *) 
   (* | Zloop      of cond * Int64.t    (* Here Zcond over approximates possibilities. *) *)
 
 let pp_instruction fmt i = 
@@ -203,3 +237,7 @@ let pp_instruction fmt i =
   | Zjmp rm ->
     fprintf fmt "jmp %a"
       pp_rm rm
+  | Zset (cond, reg) ->
+    fprintf fmt "set%a %a"
+      pp_cond cond
+      pp_byte_reg reg

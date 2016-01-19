@@ -15,11 +15,13 @@ let do_op op (n1 : Int64.t) (n2 : Int64.t) : Int64.t = match op with
   | T.Times -> Int64.mul n1 n2
   | T.Div -> Int64.div n1 n2
   | T.Lt -> bool_to_int64 (Int64.compare n1 n2 = -1)
+  | T.Gt -> bool_to_int64 (Int64.compare n1 n2 = 1)
   | T.Eq -> bool_to_int64 (Int64.compare n1 n2 = 0)
   | T.And -> bool_to_int64 (int64_to_bool n1 && int64_to_bool n2)
   | T.Or -> bool_to_int64 (int64_to_bool n1 || int64_to_bool n2)
   | T.Lshift -> Int64.shift_left n1 (Int64.to_int n2)
   | T.BitOr -> Int64.logor n1 n2
+  | T.BitAnd -> Int64.logand n1 n2
 
 (* Compute the value of an expression *)
 let rec interp_exp (store : store_t) (e : exp) : Int64.t = match e with

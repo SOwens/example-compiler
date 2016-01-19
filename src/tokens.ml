@@ -2,7 +2,7 @@ open Util
 
 (* Regular expressions that describe various syntactic entities *)
 let number_re = Str.regexp "[0-9]+"
-let ident_re = Str.regexp "[a-zA-Z][a-zA-Z0-9]*\\|[-+*/<=]\\|:=\\|&&\\|||"
+let ident_re = Str.regexp "[a-zA-Z][a-zA-Z0-9]*\\|[-+*/<>=]\\|:=\\|&&\\|||"
 let space_re = Str.regexp "[ \t]+"
 let newline_re = Str.regexp "\n"
 let bracket_re = Str.regexp "[(){}]"
@@ -14,11 +14,13 @@ type op =
   | Times
   | Div
   | Lt
+  | Gt
   | Eq
   | And
   | Or
   | Lshift
   | BitOr
+  | BitAnd
       [@@deriving show]
 
 let op_to_string op =
@@ -28,11 +30,13 @@ let op_to_string op =
   | Times -> "*"
   | Div -> "/"
   | Lt -> "<"
+  | Gt -> ">"
   | Eq -> "="
   | And -> "&&"
   | Or -> "||"
   | Lshift -> "<<"
   | BitOr -> "|"
+  | BitAnd -> "&"
 
 type token = 
   | Num of Int64.t
@@ -60,8 +64,8 @@ let keywords =
   [("while",While); ("if",If); ("then",Then); ("else",Else); (":=",Assign);
    ("true",True); ("input", Input); ("output",Output); ("false",False);
    ("+", Op Plus); ("-", Op Minus); ("*", Op Times); ("/", Op Div);
-   ("<", Op Lt); ("=", Op Eq); ("&&", Op And); ("||", Op Or); 
-   ("<<", Op Lshift); ("|", Op BitOr)]
+   ("<", Op Lt); (">", Op Gt);  ("=", Op Eq); ("&&", Op And); ("||", Op Or); 
+   ("<<", Op Lshift); ("|", Op BitOr); ("&", Op BitAnd)]
 
 (* Map each keyword string to its corresponding token *)
 let keyword_map : token Strmap.t =

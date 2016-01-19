@@ -4,11 +4,13 @@ type op =
   | Times
   | Div
   | Lt
+  | Gt
   | Eq
   | And
   | Or
   | Lshift
   | BitOr
+  | BitAnd
       [@@deriving show]
 
 val op_to_string : op -> string
