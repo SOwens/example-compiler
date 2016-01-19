@@ -49,7 +49,7 @@ printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg3;;
 let lva_cfg4 = LiveVarAnalysis.lva (List.map fst lva_cfg3);;
 printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;;
 
-let reg_cfg = RegAlloc.reg_alloc 4 (List.map fst lva_cfg4);;
+let reg_cfg = RegAlloc.reg_alloc 0 (List.map fst lva_cfg4);;
 printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg;;
 
 let linear = LineariseCfg.cfg_to_linear reg_cfg;;

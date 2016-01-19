@@ -31,7 +31,7 @@ let reg_numbers =
 let var_to_rm v =
   match v with
   | Vreg i -> Zr (List.assoc i reg_numbers)
-  | Stack i -> Zm (None, Some RSP, Some (Int64.of_int (8 * i)))
+  | Stack i -> Zm (None, Some RBP, Some (Int64.of_int (-8 * (i+1))))
   | _ -> assert false (* Register allocation should have removed all named variables *)
 
 (* Build the operation for r := r op ae *)

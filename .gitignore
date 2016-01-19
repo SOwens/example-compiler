@@ -7,3 +7,5 @@ src/_build
 tests/*.s
 tests/*.o
 tests/*.x
+
+runtime/*.o
