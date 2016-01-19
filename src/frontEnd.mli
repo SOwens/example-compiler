@@ -1,1 +1,1 @@
-val front_end : bool -> SourceAst.stmt list
+val front_end : bool -> string * SourceAst.stmt list

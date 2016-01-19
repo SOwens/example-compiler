@@ -70,10 +70,10 @@ let pp_rm fmt rm =
   match rm with
   | Zr r -> fprintf fmt "%a" pp_reg r
   | Zm (idx,base,disp) -> 
-    fprintf fmt "[%a]"
+    fprintf fmt "qword [%a]"
       simple_add_exp [option_map (fun (scale,i) -> show_reg i ^ " * " ^ string_of_int scale) idx; 
                       option_map show_reg base; 
-                      option_map [%show : Int64.t] disp]
+                      option_map Int64.to_string disp]
 
 type dest_src = 
   | Zrm_i of rm  * Int64.t  (* mnemonic r/mXX, immXX (sign-extended) *)
@@ -83,9 +83,9 @@ type dest_src =
 let pp_dest_src fmt ds =
   match ds with
   | Zrm_i (rm, i) ->
-    fprintf fmt "%a, %s"
+    fprintf fmt "%a, %Ld"
       pp_rm rm
-      ([%show : Int64.t] i)
+      i
   | Zrm_r (rm, reg) ->
     fprintf fmt "%a, %a"
       pp_rm rm
@@ -102,7 +102,7 @@ type imm_rm =
 let pp_imm_rm fmt ir = 
   match ir with
   | Zi_rm rm -> pp_rm fmt rm
-  | Zi i -> fprintf fmt "%s" ([%show:Int64.t] i)
+  | Zi i -> fprintf fmt "%Ld" i
 
 type binop_name = Zadc | Zadd | Zand | Zcmp | Zor | Zshl | Zshr | Zsar | Zsub | Zsbb | Ztest | Zxor
 
@@ -163,6 +163,7 @@ let pp_cond fmt c =
      | Z_NG -> "ng")
 
 type instruction = 
+  | Zlabel     of string
   | Zbinop     of binop_name * dest_src
   | Zmonop     of monop_name * rm
 (*
@@ -189,6 +190,8 @@ type instruction =
 
 let pp_instruction fmt i = 
   match i with
+  | Zlabel s ->
+    fprintf fmt "%s:" s
   | Zbinop (n, ds) ->
     fprintf fmt "%a %a"
       pp_binop_name n
@@ -204,10 +207,10 @@ let pp_instruction fmt i =
       pp_rm rm2
   | Zimul (r1, rm2, Some i) ->
     (* r1 := rm2 * i *)
-    fprintf fmt "imul %a, %a, %s"
+    fprintf fmt "imul %a, %a, %Ld"
       pp_reg r1
       pp_rm rm2
-      ([%show:Int64.t] i)
+      i
   | Zidiv rm ->
     fprintf fmt "idiv %a"
       pp_rm rm
@@ -224,7 +227,7 @@ let pp_instruction fmt i =
     fprintf fmt "pop %a"
       pp_imm_rm ir
   | Zret i ->
-    fprintf fmt "ret %s" ([%show : Int64.t] i)
+    fprintf fmt "ret %Ld" i
   | Zcpuid ->
     fprintf fmt "cpuid"
   | Zmov ds ->
@@ -241,3 +244,11 @@ let pp_instruction fmt i =
     fprintf fmt "set%a %a"
       pp_cond cond
       pp_byte_reg reg
+
+let pp_instr_list fmt il =
+  List.iter
+    (fun i ->
+       match i with
+       | Zlabel _ -> fprintf fmt "%a@\n" pp_instruction i
+       | _ -> fprintf fmt "  %a@\n" pp_instruction i)
+    il

@@ -1,0 +1,9 @@
+# OCaml executables
+src/*.byte
+src/*.native
+src/_build
+
+# Test executables and intermediate things
+tests/*.s
+tests/*.o
+tests/*.x

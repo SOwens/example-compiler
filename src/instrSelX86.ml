@@ -1,5 +1,6 @@
 open BlockStructure
 open X86
+module L = LineariseCfg
 module T = Tokens 
 
 let tok_to_binop t =
@@ -144,6 +145,22 @@ let rec be_to_x86 be =
           [Zmov (Zr_rm (r_scratch, m2));
            Zmov (Zrm_r (m1, r_scratch))]))
   | Ld _ | St _ -> assert false (* TODO *)
-  | In var -> assert false (* TODO *)
-  | Out var -> assert false (* TODO *)
+  | In var -> [] (* TODO *)
+  | Out var -> [] (* TODO *)
 
+
+
+let to_x86 (ll : L.linear list) : instruction list =
+  List.flatten
+    (List.map
+       (fun l ->
+          match l with
+          | L.Instr be -> be_to_x86 be
+          | L.CJump (v, b, s) ->
+            [Zbinop (Zcmp, Zrm_i (var_to_rm v, 0L));
+             Zjcc ((if b then Z_NE else Z_E), s)]
+          | L.Jump s ->
+            [Zjcc (Z_ALWAYS, s)]
+          | L.Label s ->
+            [Zlabel s])
+       ll)

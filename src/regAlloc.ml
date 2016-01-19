@@ -166,6 +166,7 @@ let reg_alloc (num_regs : int) (cfg : cfg) : cfg =
   let sorted_counts_list = 
     List.map fst (List.sort (fun (_, x) (_, y) -> compare y x) counts_list)
   in
+  let num_regs = min num_regs (List.length sorted_counts_list) in
   let (in_regs,on_stack) = ExtLib.List.split_nth num_regs sorted_counts_list in
   let reg_nums = List.map (fun x -> Vreg x) (count num_regs) in
   let stack_nums = List.map (fun x -> Stack x) (count (List.length sorted_counts_list - num_regs)) in

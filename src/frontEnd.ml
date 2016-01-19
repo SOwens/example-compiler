@@ -1,6 +1,6 @@
 open Util
 
-let front_end (print_intermediates : bool) : SourceAst.stmt list =
+let front_end (print_intermediates : bool) : (string * SourceAst.stmt list) =
   let p s =
     if print_intermediates then
       Printf.printf "%s\n" s
@@ -14,4 +14,4 @@ let front_end (print_intermediates : bool) : SourceAst.stmt list =
   let ast = SourceAst.parse_program toks in
   p ([%show: SourceAst.stmt list] ast);
   TypeCheck.type_stmts Strmap.empty ast;
-  ast
+  (filename, ast)

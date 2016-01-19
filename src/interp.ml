@@ -67,4 +67,4 @@ and interp_stmts (store : store_t) (sl : stmt list) : store_t = match sl with
     let store2 = interp_stmt store s in
     interp_stmts store2 sl;;
 
-interp_stmts Strmap.empty (FrontEnd.front_end false)
+interp_stmts Strmap.empty (snd (FrontEnd.front_end false))
