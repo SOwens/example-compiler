@@ -6,6 +6,6 @@ src/_build
 # Test executables and intermediate things
 tests/*.s
 tests/*.o
-tests/*.x
+tests/*.exe
 
 runtime/*.o
