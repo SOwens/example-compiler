@@ -1,3 +1,3 @@
 open BlockStructure
 
-val reg_alloc : int -> cfg -> cfg
+val reg_alloc : int -> cfg -> (cfg * int)

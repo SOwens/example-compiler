@@ -160,20 +160,24 @@ let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
   | Branch (v, t1, t2) ->
     Branch (Varmap.find v map, t1, t2)
 
-let reg_alloc (num_regs : int) (cfg : cfg) : cfg =
+(* The returned int is the number of variables put on the stack *)
+let reg_alloc (num_regs : int) (cfg : cfg) : (cfg * int) =
   let counts = count_vars cfg in
   let counts_list = Varmap.bindings counts in
   let sorted_counts_list = 
     List.map fst (List.sort (fun (_, x) (_, y) -> compare y x) counts_list)
   in
   let num_regs = min num_regs (List.length sorted_counts_list) in
+  let num_stacks = List.length sorted_counts_list - num_regs in
   let (in_regs,on_stack) = ExtLib.List.split_nth num_regs sorted_counts_list in
   let reg_nums = List.map (fun x -> Vreg x) (count num_regs) in
-  let stack_nums = List.map (fun x -> Stack x) (count (List.length sorted_counts_list - num_regs)) in
+  let stack_nums = List.map (fun x -> Stack x) (count num_stacks) in
   let alloc_list = zip in_regs reg_nums @ zip on_stack stack_nums in
   let map = List.fold_right (fun (k,v) m -> Varmap.add k v m) alloc_list Varmap.empty in
-  List.map (fun entry -> { bnum = entry.bnum; 
-                           elems = List.map (reg_alloc_be map) entry.elems; 
-                           next = reg_alloc_nb map entry.next;
-                           finished = false;
-                           started = false }) cfg
+  let cfg =
+    List.map (fun entry -> { bnum = entry.bnum; 
+                             elems = List.map (reg_alloc_be map) entry.elems; 
+                             next = reg_alloc_nb map entry.next;
+                             finished = false;
+                             started = false }) cfg in
+  (cfg, num_stacks)

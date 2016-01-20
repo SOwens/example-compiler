@@ -1,5 +1,5 @@
 COMPILER = ../src/compile.byte
-EXEC_FILES = fact.x fact2.x
+EXEC_FILES = fact.x
 
 .PHONY : all clean
 
@@ -11,8 +11,8 @@ all : $(EXEC_FILES)
 %.o : %.s
 	nasm -f macho64 $<
 
-%.x : %.o
-	ld $< -o $@
+%.x : %.o ../runtime/io.o
+	ld -lc ../runtime/io.o $< -o $@
 
 .PRECIOUS : %.s
 

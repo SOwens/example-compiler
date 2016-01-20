@@ -49,18 +49,21 @@ printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg3;;
 let lva_cfg4 = LiveVarAnalysis.lva (List.map fst lva_cfg3);;
 printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;;
 
-let reg_cfg = RegAlloc.reg_alloc 0 (List.map fst lva_cfg4);;
+let (reg_cfg, num_stack) = RegAlloc.reg_alloc 5 (List.map fst lva_cfg4);;
 printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg;;
 
 let linear = LineariseCfg.cfg_to_linear reg_cfg;;
 printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;;
 
-let x86 = InstrSelX86.to_x86 linear;;
+let x86 = InstrSelX86.to_x86 linear num_stack;;
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
 fprintf fmt "[section .text align=16]@\n";;
 fprintf fmt "global start@\n@\n";;
+fprintf fmt "extern _input@\n";;
+fprintf fmt "extern _output@\n@\n";;
 fprintf fmt "start:@\n";;
+fprintf fmt "  push 0@\n";; (* Dummy return address for alignment purposes *)
 fprintf fmt "%a" X86.pp_instr_list x86;;
 (* Prepare for exit system call *)
 fprintf fmt "exit:";; 

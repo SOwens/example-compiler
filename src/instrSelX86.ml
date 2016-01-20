@@ -78,7 +78,27 @@ let op_to_cond op =
   | T.Eq -> Z_E
   | _ -> assert false
 
+(* Don't save RAX, since it is our scratch. Remember to do an even number
+   before a call for alignment *)
+let caller_save =
+  [Zpush (Zi_rm (Zr RCX));
+   Zpush (Zi_rm (Zr RDX));
+   Zpush (Zi_rm (Zr RSI));
+   Zpush (Zi_rm (Zr RDI));
+   Zpush (Zi_rm (Zr R8));
+   Zpush (Zi_rm (Zr R9));
+   Zpush (Zi_rm (Zr R10));
+   Zpush (Zi_rm (Zr R11))]
 
+let caller_restore =
+  [Zpop (Zr R11);
+   Zpop (Zr R10);
+   Zpop (Zr R9);
+   Zpop (Zr R8);
+   Zpop (Zr RDI);
+   Zpop (Zr RSI);
+   Zpop (Zr RDX);
+   Zpop (Zr RCX)]
 
 let rec be_to_x86 be =
   match be with
@@ -116,7 +136,7 @@ let rec be_to_x86 be =
        Zmov (Zrm_i (Zr r1, imm2)) :: build_to_reg_op op r1 ae2
      | (Zr r1, Ident var) ->
        (* r1 := m/r2 op m/r3/imm3 --> mov r1, m/r2; op r1, m/r3/imm3 *)
-       Zmov (Zr_rm (r1, var_to_rm v)) :: build_to_reg_op op r1 ae2
+       Zmov (Zr_rm (r1, var_to_rm var)) :: build_to_reg_op op r1 ae2
      | (Zm _ as m1, Num imm2) ->
        (* m1 := imm2 op m/r3 --> mov r_scratch, imm2; op r_scratch, m/r3; mov m1, r_scratch *)
        Zmov (Zrm_i (Zr r_scratch, imm2)) ::
@@ -145,12 +165,28 @@ let rec be_to_x86 be =
           [Zmov (Zr_rm (r_scratch, m2));
            Zmov (Zrm_r (m1, r_scratch))]))
   | Ld _ | St _ -> assert false (* TODO *)
-  | In var -> [] (* TODO *)
-  | Out var -> [] (* TODO *)
+  | In v ->
+    caller_save @ 
+    [Zcall "_input"] @
+    caller_restore @
+    [Zmov (Zrm_r (var_to_rm v, RAX))]
+  | Out v -> 
+    caller_save @ 
+    [Zmov (Zr_rm (RDI, var_to_rm v));
+     Zcall "_output"] @
+    caller_restore
 
-
-
-let to_x86 (ll : L.linear list) : instruction list =
+let to_x86 (ll : L.linear list) (num_stack : int) : instruction list =
+  (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
+  let num_stack = 
+    if num_stack mod 2 = 0 then
+      num_stack 
+    else
+      num_stack + 1
+  in
+  Zpush (Zi_rm (Zr RBP)) ::
+  Zmov (Zr_rm (RBP, Zr RSP)) ::
+  Zbinop (Zsub, Zrm_i (Zr RSP, Int64.mul (Int64.of_int num_stack) 8L)) ::
   List.flatten
     (List.map
        (fun l ->

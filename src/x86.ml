@@ -176,7 +176,7 @@ type instruction =
   | Zlea       of dest_src
   | Zpop       of rm
   | Zpush      of imm_rm
-  | Zcall      of imm_rm
+  | Zcall      of string
   | Zret       of Int64.t
   | Zcpuid
   | Zmov       of dest_src
@@ -221,11 +221,10 @@ let pp_instruction fmt i =
     fprintf fmt "pop %a"
       pp_rm rm
   | Zpush ir ->
-    fprintf fmt "pop %a"
+    fprintf fmt "push %a"
       pp_imm_rm ir
-  | Zcall ir ->
-    fprintf fmt "pop %a"
-      pp_imm_rm ir
+  | Zcall lab ->
+    fprintf fmt "call %s" lab
   | Zret i ->
     fprintf fmt "ret %Ld" i
   | Zcpuid ->
