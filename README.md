@@ -7,10 +7,14 @@ Running the compiler
 
 The compiler relies on OCaml and several libraries: ocamlfind, extlib,
 ppx_deriving, and ppx_monadic. It is tested with OCaml version 4.02.3, and
-ocamlfind 1.5.6, extlib 1.7.0, ppx_deriving 3.0, and ppx_monadic 1.0.3. All of these libraries can be installed via opam:
-`opam install extlib
- opam install ppx_deriving
- opam install ppx_monadic`
+ocamlfind 1.5.6, extlib 1.7.0, ppx_deriving 3.0, and ppx_monadic 1.0.3. All of
+these libraries can be installed via opam. Opam installs everything into
+`.opam` in your home directory:
+```
+opam install extlib
+opam install ppx_deriving
+opam install ppx_monadic
+```
 
 To compile the compiler run `make` in the `src` directory. This should produce
 `compile.byte` and `interp.byte` executables.  Both take a single command-line
@@ -25,7 +29,7 @@ First run `make` in the `runtime` directory to compile the very simple runtime
 library (using gcc).
 
 Use `nasm -f macho64 *filename*.s` to assemble the compiler's output for
-*filename*, and then `gcc *COMPILER-DIR*/runtime/io.o *filename.o -o filename`
+*filename*, and then `gcc *COMPILER-DIR*/runtime/io.o *filename*.o -o filename`
 to link the program with the runtime library.
 
 The source language
