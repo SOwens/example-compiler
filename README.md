@@ -43,6 +43,7 @@ are not keywords.
 Numbers are sequences of digits that fit into a 64-bit signed integer.
 
 All numerical operations are on signed, 2s complement 64-bit integers.
+
 op ::=  
 | `+`  --- Addition  
 | `-`  --- Subtraction  
@@ -57,7 +58,7 @@ op ::=
 | `||` --- Logical Or  
 | `&&` --- Logical And  
 
-exp ::= 
+exp ::=  
 | identifier  
 | number  
 | `true`   
