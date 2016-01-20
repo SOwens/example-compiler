@@ -1,3 +1,9 @@
+# For OS X
+# FORMAT = macho64
+
+# For Linux
+# FORMAT = elf64
+
 COMPILER = ../src/compile.byte
 EXEC_FILES = fact.exe
 
@@ -9,7 +15,7 @@ all : $(EXEC_FILES)
 	$(COMPILER) $<
 
 %.o : %.s
-	nasm -f macho64 $<
+	nasm -f $(FORMAT) $<
 
 # Use gcc to do the linking since we want to include libc, and our
 # object code starts from  a C-style main function. We do not want to 
