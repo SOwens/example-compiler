@@ -43,37 +43,37 @@ are not keywords.
 Numbers are sequences of digits that fit into a 64-bit signed integer.
 
 All numerical operations are on signed, 2s complement 64-bit integers.
-op ::= 
-  `+`    Addition
-| `-`    Subtraction 
-| `*`    Multiplication
-| /      Division
-| |      Bitwise-or
-| &      Bitwise-and
-| <<     Left shift
-| <      Less than
-| >      Greater than 
-| =      Equality
-| ||     Logical Or
-| &&     Logical And
+op ::=  
+  `+`    Addition  
+| `-`    Subtraction  
+| `*`    Multiplication  
+| /      Division  
+| |      Bitwise-or  
+| &      Bitwise-and  
+| <<     Left shift  
+| <      Less than  
+| >      Greater than   
+| =      Equality  
+| ||     Logical Or  
+| &&     Logical And  
 
 exp ::= 
-  identifier
-| number
-| `true`
-| `false`
-| `(` exp op exp `)`
+  identifier  
+| number  
+| `true`   
+| `false`  
+| `(` exp op exp `)`   
 
-stmt ::= 
-  identifier `:=` exp
-| `while` exp stmt
-| `if` exp `then` stmt `else` stmt
-| `{` stmts `}`
-| `input` identifier
+stmt ::=  
+  identifier `:=` exp  
+| `while` exp stmt  
+| `if` exp `then` stmt `else` stmt  
+| `{` stmts `}`  
+| `input` identifier  
 | `output` identifier
 
-stmts ::= 
-  epsilon
+stmts ::=   
+  epsilon  
 | stmt stmts
 
 A program is just a stmts.
