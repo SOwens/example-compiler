@@ -12,7 +12,7 @@ all : $(EXEC_FILES)
 	nasm -f macho64 $<
 
 %.x : %.o ../runtime/io.o
-	ld -lc ../runtime/io.o $< -o $@
+	gcc ../runtime/io.o $< -o $@
 
 .PRECIOUS : %.s
 

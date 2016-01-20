@@ -59,17 +59,16 @@ let x86 = InstrSelX86.to_x86 linear num_stack;;
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
 fprintf fmt "[section .text align=16]@\n";;
-fprintf fmt "global start@\n@\n";;
+fprintf fmt "global _main@\n@\n";;
 fprintf fmt "extern _input@\n";;
 fprintf fmt "extern _output@\n@\n";;
-fprintf fmt "start:@\n";;
-fprintf fmt "  push 0@\n";; (* Dummy return address for alignment purposes *)
+fprintf fmt "_main:@\n";;
 fprintf fmt "%a" X86.pp_instr_list x86;;
 (* Prepare for exit system call *)
 fprintf fmt "exit:";; 
-fprintf fmt "  mov RAX, 0x2000001@\n";; (* Do syscall 1 *)
-fprintf fmt "  mov RDI, 0@\n";;         (* Exit with 0, e.g. success *)
-fprintf fmt "  syscall@\n@\n";;
+fprintf fmt "  mov rax, 0@\n";; (* Exit with 0, e.g. success *)
+fprintf fmt "  leave@\n";; 
+fprintf fmt "  ret@\n@\n";;
 (* OS X crashes if there isn't a data segment with something in it *)
 fprintf fmt "[section .data align=16]@\n";;
 fprintf fmt "dummy: db \" \", 0x0a";;
