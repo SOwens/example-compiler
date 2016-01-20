@@ -11,22 +11,26 @@ let tok_to_binop t =
   | T.BitOr -> Zor
   | T.BitAnd -> Zand
   | _ -> assert false
+  
+let num_regs = 11
 
-(* Save RSP for stack stuff,
+(* Save RSP and RBP for stack stuff,
    save RAX for scratch, and index it by -1
    very pessimistically save RDX for division *)
 let reg_numbers =
   [(-1, RAX);
    (0, RBX);
    (1, RCX);
-   (2, R8);
-   (3, R9);
-   (4, R10);
-   (5, R11);
-   (6, R12);
-   (7, R13);
-   (8, R14);
-   (9, R15)]
+   (2, RSI);
+   (3, RDI);
+   (4, R8);
+   (5, R9);
+   (6, R10);
+   (7, R11);
+   (8, R12);
+   (9, R13);
+   (10, R14);
+   (11, R15)]
 
 let var_to_rm v =
   match v with

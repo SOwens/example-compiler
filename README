@@ -1,30 +1,75 @@
-A simple compiler for a simple imperative language targeting x86-64 assembly.
+A simple compiler for a simple imperative language targeting x86-64 assembly
+(for systems that follow the System V ABI, so most operating systems **except**
+Windows).
 
-Keywords are + - * / < = || && := while if then else input output.
+Running the compiler
+--------------------
+
+The compiler relies on OCaml and several libraries: ocamlfind, extlib,
+ppx_deriving, and ppx_monadic. It is tested with OCaml version 4.02.3, and
+ocamlfind 1.5.6, extlib 1.7.0, ppx_deriving 3.0, and ppx_monadic 1.0.3. All of these libraries can be installed via opam:
+`opam install extlib
+ opam install ppx_deriving
+ opam install ppx_monadic`
+
+To compile the compiler run `make` in the `src` directory. This should produce
+`compile.byte` and `interp.byte` executables.  Both take a single command-line
+argument: a source file name with the `.expl` extension. `interp.byte` runs the
+file, `compile.byte` compiles it, generating an x86-46 assembly `.s` file in
+*nasm* syntax.
+
+Compiling target programs
+-------------------------
+
+First run `make` in the `runtime` directory to compile the very simple runtime
+library (using gcc).
+
+Use `nasm -f macho64 *filename*.s` to assemble the compiler's output for
+*filename*, and then `gcc *COMPILER-DIR*/runtime/io.o *filename.o -o filename`
+to link the program with the runtime library.
+
+The source language
+-------------------
+
+Keywords are `+ - * / | & << < > = || && := while if then else input output true false`
 
 Identifiers are strings of letters and digits (starting with a letter) that
 are not keywords.
 
 Numbers are sequences of digits that fit into a 64-bit signed integer.
 
-exp ::= identifier
-      | number
-      | true
-      | false
-      | ( exp op exp )
+All numerical operations are on signed, 2s complement 64-bit integers.
+op ::= 
+  `+`    Addition
+| `-`    Subtraction 
+| `*`    Multiplication
+| /      Division
+| |      Bitwise-or
+| &      Bitwise-and
+| <<     Left shift
+| <      Less than
+| >      Greater than 
+| =      Equality
+| ||     Logical Or
+| &&     Logical And
 
-op ::= + | - | * | / | < | = | || | &&
+exp ::= 
+  identifier
+| number
+| `true`
+| `false`
+| `(` exp op exp `)`
 
-stmt ::= identifier := exp
-       | while exp stmt
-       | if exp then stmt else stmt
-       | { stmts }
-       | input identifier
-       | output identifier
+stmt ::= 
+  identifier `:=` exp
+| `while` exp stmt
+| `if` exp `then` stmt `else` stmt
+| `{` stmts `}`
+| `input` identifier
+| `output` identifier
 
-stmts ::= epsilon
-        | stmt stmts
+stmts ::= 
+  epsilon
+| stmt stmts
 
 A program is just a stmts.
-
-Relies on the extlib and deriving libraries

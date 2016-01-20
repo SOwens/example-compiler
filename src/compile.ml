@@ -1,29 +1,33 @@
 open Util
 open Format
 
-let (filename, ast) = FrontEnd.front_end true;;
+let (filename, ast) = FrontEnd.front_end false;;
 
 let (_,opt_ast) = ConstProp.prop_stmts Strmap.empty ast;;
+(*
 print_newline ();;
 print_string ([%show: SourceAst.stmt list] opt_ast);;
 print_newline ();;
+   *)
 
 let no_bool_ast = RemoveBool.remove_and_or opt_ast;;
+(*
 print_newline ();;
 print_string ([%show: SourceAst.stmt list] no_bool_ast);;
 print_newline ();;
+   *)
 
 let cfg = BlockStructure.build_cfg no_bool_ast;;
-printf "@\n%a@\n" BlockStructure.pp_cfg cfg;;
+(* printf "@\n%a@\n" BlockStructure.pp_cfg cfg;; *)
 
 let cfg' = ShrinkImmediates.shrink_imm cfg;;
-printf "@\n%a@\n" BlockStructure.pp_cfg cfg';;
+(* printf "@\n%a@\n" BlockStructure.pp_cfg cfg';; *)
 
 let lva_cfg0 = LiveVarAnalysis.lva cfg';;
-printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg0;;
+(* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg0;; *)
 
 let lva_cfg1 = LiveVarAnalysis.remove_unused_writes lva_cfg0;;
-printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg1;;
+(* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg1;; *)
 
 (* Iterate analysis for examples like this:
 
@@ -41,19 +45,19 @@ output x
 *)
 
 let lva_cfg2 = LiveVarAnalysis.lva (List.map fst lva_cfg1);;
-printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg2;;
+(* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg2;; *)
 
 let lva_cfg3 = LiveVarAnalysis.remove_unused_writes lva_cfg2;;
-printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg3;;
+(* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg3;; *)
 
 let lva_cfg4 = LiveVarAnalysis.lva (List.map fst lva_cfg3);;
-printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;;
+(* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;; *)
 
-let (reg_cfg, num_stack) = RegAlloc.reg_alloc 5 (List.map fst lva_cfg4);;
-printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg;;
+let (reg_cfg, num_stack) = RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst lva_cfg4);;
+(* printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg;; *)
 
 let linear = LineariseCfg.cfg_to_linear reg_cfg;;
-printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;;
+(* printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;; *)
 
 let x86 = InstrSelX86.to_x86 linear num_stack;;
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
