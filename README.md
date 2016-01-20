@@ -28,8 +28,8 @@ Compiling target programs
 First run `make` in the `runtime` directory to compile the very simple runtime
 library (using gcc).
 
-Use `nasm -f macho64 *filename*.s` to assemble the compiler's output for
-*filename*, and then `gcc *COMPILER-DIR*/runtime/io.o *filename*.o -o filename`
+Use `nasm -f macho64 FILENAME.s` to assemble the compiler's output for
+*FILENAME*, and then `gcc COMPILER_DIR/runtime/io.o FILENAME.o -o FILENAME`
 to link the program with the runtime library.
 
 The source language
