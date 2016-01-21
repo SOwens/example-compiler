@@ -16,4 +16,4 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-val front_end : bool -> string * SourceAst.stmt list
+val front_end : string -> bool -> SourceAst.stmt list

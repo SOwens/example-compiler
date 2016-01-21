@@ -19,7 +19,42 @@
 open Util
 open Format
 
-let (filename, ast) = FrontEnd.front_end false;;
+let osx = ref false;;
+let filename_ref = ref None;;
+
+let options = Arg.align ([
+  ( "-osx", 
+    Arg.Set osx,
+    " generate assembler for OS X");
+   ( "-linux", 
+    Arg.Clear osx,
+    " generate assembler for Linux (default)");
+  ]);;
+
+let usage_msg = 
+  "example compiler \nexample usage:       compile.byte test.expl\n" 
+    
+let _ = 
+  Arg.parse options 
+    (fun s -> 
+       match !filename_ref with
+       | None ->
+         filename_ref := Some s
+       | Some s' ->
+         (Format.printf "Error: given multiple files to process: %s and %s\n" s' s;
+          exit 1))
+    usage_msg
+
+let filename = 
+ match !filename_ref with
+  | None ->
+    (print_string usage_msg;
+     exit 1)
+  | Some filename ->
+    filename
+  
+let ast = 
+   FrontEnd.front_end filename false;;
 
 let (_,opt_ast) = ConstProp.prop_stmts Strmap.empty ast;;
 (*
