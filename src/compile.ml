@@ -112,14 +112,16 @@ let (reg_cfg, num_stack) = RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst
 let linear = LineariseCfg.cfg_to_linear reg_cfg;;
 (* printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;; *)
 
+let under = if !osx then "_" else "";;
+
 let x86 = InstrSelX86.to_x86 (!osx) linear num_stack;;
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
 fprintf fmt "[section .text align=16]@\n";;
-fprintf fmt "global _main@\n@\n";;
-fprintf fmt "extern _input@\n";;
-fprintf fmt "extern _output@\n@\n";;
-fprintf fmt "_main:@\n";;
+fprintf fmt "global %smain@\n@\n" under;;
+fprintf fmt "extern %sinput@\n" under;;
+fprintf fmt "extern %soutput@\n@\n" under;;
+fprintf fmt "%smain:@\n" under;;
 fprintf fmt "%a" X86.pp_instr_list x86;;
 (* Prepare for exit system call *)
 fprintf fmt "exit:";; 
