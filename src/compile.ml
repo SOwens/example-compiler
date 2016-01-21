@@ -112,7 +112,7 @@ let (reg_cfg, num_stack) = RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst
 let linear = LineariseCfg.cfg_to_linear reg_cfg;;
 (* printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;; *)
 
-let x86 = InstrSelX86.to_x86 linear num_stack;;
+let x86 = InstrSelX86.to_x86 (!osx) linear num_stack;;
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
 fprintf fmt "[section .text align=16]@\n";;

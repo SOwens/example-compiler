@@ -1,8 +1,10 @@
 # For OS X
 # FORMAT = macho64
+# OPTIONS = -osx
 
 # For Linux
 # FORMAT = elf64
+# OPTIONS = -linux
 
 COMPILER = ../src/compile.byte
 EXEC_FILES = fact.exe
@@ -12,7 +14,7 @@ EXEC_FILES = fact.exe
 all : $(EXEC_FILES)
 
 %.s : %.expl $(COMPILER)
-	$(COMPILER) $<
+	$(COMPILER) $(OPTIONS) $<
 
 %.o : %.s
 	nasm -f $(FORMAT) $<

@@ -122,10 +122,10 @@ let caller_restore =
    Zpop (Zr RDX);
    Zpop (Zr RCX)]
 
-let rec be_to_x86 be =
+let rec be_to_x86 (underscore_labels : bool) be =
   match be with
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
-    be_to_x86 (AssignOp (v, ae2, invert_op op, Num imm)) (* constant prop ensures both aren't immediate *)
+    be_to_x86 underscore_labels (AssignOp (v, ae2, invert_op op, Num imm)) (* constant prop ensures both aren't immediate *)
   | AssignOp (v, Ident v2, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     let cmp_instr = 
       match ae2 with 
@@ -189,16 +189,16 @@ let rec be_to_x86 be =
   | Ld _ | St _ -> assert false (* TODO *)
   | In v ->
     caller_save @ 
-    [Zcall "_input"] @
+    [Zcall ((if underscore_labels then "_" else "") ^ "input")] @
     caller_restore @
     [Zmov (Zrm_r (var_to_rm v, RAX))]
   | Out v -> 
     caller_save @ 
     [Zmov (Zr_rm (RDI, var_to_rm v));
-     Zcall "_output"] @
+     Zcall ((if underscore_labels then "_" else "") ^ "output")] @
     caller_restore
 
-let to_x86 (ll : L.linear list) (num_stack : int) : instruction list =
+let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int) : instruction list =
   (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
   let num_stack = 
     if num_stack mod 2 = 0 then
@@ -213,7 +213,7 @@ let to_x86 (ll : L.linear list) (num_stack : int) : instruction list =
     (List.map
        (fun l ->
           match l with
-          | L.Instr be -> be_to_x86 be
+          | L.Instr be -> be_to_x86 underscore_labels be
           | L.CJump (v, b, s) ->
             [Zbinop (Zcmp, Zrm_i (var_to_rm v, 0L));
              Zjcc ((if b then Z_NE else Z_E), s)]
