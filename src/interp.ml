@@ -19,7 +19,33 @@
 open Util
 open SourceAst
 
-type store_t = Int64.t Strmap.t
+exception Crash of string
+
+(* Values are either integers or n-dimensional arrays of integers.
+   We keep multi-dimensional arrays in a single dimensional one and include a
+   list of how big each dimension is. *)
+type val_t =
+  | Vint of Int64.t
+  | Varray of int list * Int64.t array
+
+(* Given the array's dimensions, work out the slot for a particular set of
+   indices. Return None if one of the indices is out of bounds, i.e. greater
+   than the size. *)
+let array_address (sizes : int list) (indices : int list) : int option =
+  let rec f sizes indices acc =
+    match (sizes, indices) with
+    | ([], []) -> 0
+    | (s1::sizes, i1::indices) ->
+        i1 * acc + f sizes indices (acc * s1)
+    | _ -> assert false
+  in
+  assert (List.length sizes = List.length indices);
+  if List.for_all2 (fun s i -> i < s) sizes indices then
+    Some (f sizes indices 1)
+  else
+    None
+
+type store_t = val_t Strmap.t
 
 let bool_to_int64 (b : bool) : Int64.t = 
   if b then 1L else 0L
@@ -42,12 +68,19 @@ let do_op op (n1 : Int64.t) (n2 : Int64.t) : Int64.t = match op with
   | T.BitAnd -> Int64.logand n1 n2
 
 (* Compute the value of an expression *)
-let rec interp_exp (store : store_t) (e : exp) : Int64.t = match e with
-  | Ident (i, _) -> Strmap.find i store
-  | Num n -> n
-  | Bool b -> bool_to_int64 b
+let rec interp_exp (store : store_t) (e : exp) : val_t =
+  match e with
+  | Ident (i, [], _) -> Strmap.find i store
+  | Ident (i, indices, _) ->
+
+  | Num n -> Vint n
+  | Bool b -> Vint (bool_to_int64 b)
   | Oper (e1, (op, _), e2) ->
-    do_op op (interp_exp store e1) (interp_exp store e2)
+    (match (interp_exp store e1, interp_exp store e2) with
+     | (Vint n1, Vint n2) ->
+       Vint (do_op op n1 n2)
+     | _ ->
+       raise (Crash "operator given non-integer value"))
 
 (* Run a statement *)
 let rec interp_stmt (store : store_t) (s : stmt) : store_t = match s with

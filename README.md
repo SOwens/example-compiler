@@ -35,7 +35,7 @@ to link the program with the runtime library.
 The source language
 -------------------
 
-Keywords are `+ - * / | & << < > = || && := while if then else input output true false`
+Keywords are `+ - * / | & << < > = || && := while if then else input output true false array`
 
 Identifiers are strings of letters and digits (starting with a letter) that
 are not keywords.
@@ -53,28 +53,37 @@ op ::=
 | `&`  --- Bitwise-and  
 | `<<` --- Left shift  
 | `<`  --- Less than  
-| `>`  --- Greater than   
+| `>`  --- Greater than  
 | `=`  --- Equality  
 | `||` --- Logical Or  
-| `&&` --- Logical And  
+| `&&` --- Logical And
+
+indices ::=  
+| epsilon  
+| `[` exp `]` indices
+
+atomic_exp ::=  
+| identifier indices  
+| number  
+| `true`  
+| `false`  
+| `(` atomic_exp op atomic_exp `)`
+| `array` indices
 
 exp ::=  
-| identifier  
-| number  
-| `true`   
-| `false`  
-| `(` exp op exp `)`   
+| atomic_exp
+| atomic_exp op atmoic_exp
 
 stmt ::=  
-| identifier `:=` exp  
+| identifier indices `:=` exp  
 | `while` exp stmt  
 | `if` exp `then` stmt `else` stmt  
 | `{` stmts `}`  
 | `input` identifier  
 | `output` identifier
 
-stmts ::=   
+stmts ::=  
 | epsilon  
 | stmt stmts
 
-A program is just a stmts.
+A program is just a stmt.

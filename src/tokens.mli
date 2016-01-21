@@ -41,6 +41,8 @@ type token =
   | Rparen
   | Lcurly
   | Rcurly
+  | Lbrac
+  | Rbrac
   | While
   | If
   | Then
@@ -50,6 +52,7 @@ type token =
   | False
   | Input
   | Output
+  | Array
       [@@deriving show]
 
 type tok_loc = (token * int)

@@ -17,24 +17,25 @@
 *)
 
 open Util
-module T = Tokens 
+module T = Tokens
 
 type id = string [@@deriving show]
 
 (* AST of expressions *)
-type exp = 
+type exp =
   (* The int is the line number of the identifier *)
-  | Ident of id * int
+  | Ident of id * exp list * int
   | Num of Int64.t
   | Bool of bool
   (* The int is the line number of the operator *)
   | Oper of exp * (T.op * int) * exp
+  | Array of exp list
               [@@deriving show]
 
 (* AST of statements *)
 (* The ints are all the line number of the (start of) the stmt *)
-type stmt = 
-  | Assign of id * exp * int
+type stmt =
+  | Assign of id * exp list * exp * int
   | While of exp * stmt * int
   | Ite of exp * stmt * stmt * int
   | Stmts of stmt list * int
@@ -44,23 +45,47 @@ type stmt =
 
 (* Convert the first expression in toks into an AST. Return it with the left
    over tokens *)
-let rec parse_exp (toks : T.tok_loc list) : exp * T.tok_loc list = 
+let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   match toks with
   | [] -> raise (BadInput "End of file while parsing an expression")
-  | (T.Ident i, ln) :: toks -> (Ident (i, ln), toks)
-  | (T.Num n, _) :: toks -> (Num n, toks) 
+  | (T.Ident i, ln) :: toks ->
+    let (indices, toks) = parse_indices toks in
+    (Ident (i, indices, ln), toks)
+  | (T.Num n, _) :: toks -> (Num n, toks)
   | (T.True, _) :: toks -> (Bool true, toks)
   | (T.False, _) :: toks -> (Bool false, toks)
-  | (T.Lparen, ln) :: toks -> 
-    (match parse_exp toks with
+  | (T.Lparen, ln) :: toks ->
+    (match parse_atomic_exp toks with
      | (e, (T.Op o, ln) :: toks2) ->
-       (match parse_exp toks2 with
+       (match parse_atomic_exp toks2 with
         | (e', (T.Rparen, ln) :: toks3) -> (Oper (e, (o, ln), e'), toks3)
         | _ -> raise (BadInput ("Missing ')' on line " ^ string_of_int ln)))
-     | _ -> raise (BadInput ("Expected operator on line " ^ 
+     | _ -> raise (BadInput ("Expected operator on line " ^
                              string_of_int ln)))
+  | (T.Array, _) :: toks ->
+    let (indices, toks) = parse_indices toks in
+    (Array indices, toks)
   | (_, ln) :: _ ->
     raise (BadInput ("Expected expression on line" ^ string_of_int ln))
+and parse_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
+  let (exp1, toks) = parse_atomic_exp toks in
+  match toks with
+  | (T.Op o, ln) :: toks ->
+    let (exp2, toks) = parse_atomic_exp toks in
+    (Oper (exp1, (o, ln), exp2), toks)
+  | _ ->
+    (exp1, toks)
+and parse_indices (toks : T.tok_loc list) : exp list * T.tok_loc list =
+  match toks with
+  | (T.Lbrac, l) :: toks ->
+    let (exp, toks) = parse_exp toks in
+    (match toks with
+     | (T.Rbrac, _) :: toks ->
+       let (exps,toks) = parse_indices toks in
+       (exp::exps, toks)
+     | _ -> raise (BadInput ("Missing ']' on line " ^ string_of_int l)))
+  | _ ->
+    ([], toks)
 
 (* Convert the first statement in toks into an AST. Return it with the left
    over tokens *)
@@ -69,9 +94,10 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list=
   | [] -> raise (BadInput "End of file while parsing a statement")
   | (T.Input, ln) :: (T.Ident x, _) :: toks -> (In (x, ln), toks)
   | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Out (x, ln), toks)
-  | (T.Ident x, ln) :: (T.Assign, _) :: toks -> 
-    let (e, toks') = parse_exp toks in
-    (Assign (x, e, ln), toks')
+  | (T.Ident x, ln) :: (T.Assign, _) :: toks ->
+    let (e, toks) = parse_exp toks in
+    let (indices, toks) = parse_indices toks in
+    (Assign (x, indices, e, ln), toks)
   | (T.While, ln) :: toks ->
     let (e, toks1) = parse_exp toks in
     let (s, toks2) = parse_stmt toks1 in
@@ -88,7 +114,7 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list=
   | (T.Lcurly, ln) :: toks ->
     let (s_list, toks) = parse_stmt_list toks in
     (Stmts (s_list, ln), toks)
-  | (_,ln) :: _ -> 
+  | (_,ln) :: _ ->
     raise (BadInput ("Bad statement on line " ^ string_of_int ln))
 
 (* Convert all of the statement in toks into an AST. Return them with the left
@@ -102,8 +128,8 @@ and parse_stmt_list (toks : T.tok_loc list) : stmt list * T.tok_loc list =
     (s::s_list, toks'')
 
 (* Repeatedly parse statments until the input is empty *)
-(* NB, the difference between parse_stmt_list which can leave leftover tokens *) 
-let rec parse_program (toks : T.tok_loc list) : stmt list = 
+(* NB, the difference between parse_stmt_list which can leave leftover tokens *)
+let rec parse_program (toks : T.tok_loc list) : stmt list =
   match toks with
   | [] -> []
   | _ ->

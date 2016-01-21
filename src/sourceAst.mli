@@ -16,21 +16,22 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-module T = Tokens 
+module T = Tokens
 type id = string [@@deriving show]
 
-type exp = 
+type exp =
   (* the int is the line number of the identifier *)
-  | Ident of id * int
+  | Ident of id * exp list * int
   | Num of Int64.t
   | Bool of bool
   (* the int is the line number of the operator *)
   | Oper of exp * (T.op * int) * exp
+  | Array of exp list
               [@@deriving show]
 
 (* the ints are all the line number of the (start of) the stmt *)
-type stmt = 
-  | Assign of id * exp * int
+type stmt =
+  | Assign of id * exp list * exp * int
   | While of exp * stmt * int
   | Ite of exp * stmt * stmt * int
   | Stmts of stmt list * int
