@@ -16,44 +16,66 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* An interpreter. There is code at the bottom of the file that calls the interpreter, making this
+   suitable for compilation into an executable. *)
+
 open Util
 open SourceAst
 
+(* For when the interpreter crashed, such as array bounds violations *)
 exception Crash of string
+
+(* For errors that a well-typed program can't have *)
+exception TypeError
 
 (* Values are either integers or n-dimensional arrays of integers.
    We keep multi-dimensional arrays in a single dimensional one and include a
    list of how big each dimension is. *)
 type val_t =
-  | Vint of Int64.t
-  | Varray of int list * Int64.t array
+  | Vint of int64
+  | Varray of int list * int64 array
+
+let val_t_to_int (v : val_t) : int64 =
+  match v with
+  | Vint i -> i
+  | Varray _ -> raise TypeError
+
+let val_t_to_array (v : val_t) : int list * int64 array =
+  match v with
+  | Vint _ -> raise TypeError
+  | Varray (dims, a) -> (dims, a)
 
 (* Given the array's dimensions, work out the slot for a particular set of
-   indices. Return None if one of the indices is out of bounds, i.e. greater
-   than the size. *)
+   indices. sizes and indices must have the same length.  Return None if one of
+   the indices is out of bounds, i.e. greater than the size.
+*)
 let array_address (sizes : int list) (indices : int list) : int option =
-  let rec f sizes indices acc =
+  (* acc keeps track of the product of the dimensions seen so far *)
+  let rec f sizes indices (acc : int) =
     match (sizes, indices) with
     | ([], []) -> 0
     | (s1::sizes, i1::indices) ->
-        i1 * acc + f sizes indices (acc * s1)
-    | _ -> assert false
+        i1 * acc + f sizes indices (s1 * acc)
+    | _ ->
+      raise TypeError
   in
-  assert (List.length sizes = List.length indices);
   if List.for_all2 (fun s i -> i < s) sizes indices then
     Some (f sizes indices 1)
   else
     None
 
+(* The store will map variable names to values *)
 type store_t = val_t Strmap.t
 
-let bool_to_int64 (b : bool) : Int64.t = 
+let bool_to_int64 (b : bool) : int64 =
   if b then 1L else 0L
-let int64_to_bool (i : Int64.t) : bool = 
+
+let int64_to_bool (i : int64) : bool =
   if Int64.compare i 0L = 0 then false else true
 
 (* Do a primitive operation *)
-let do_op op (n1 : Int64.t) (n2 : Int64.t) : Int64.t = match op with
+let do_op op (n1 : int64) (n2 : int64) : int64 =
+  match op with
   | T.Plus -> Int64.add n1 n2
   | T.Minus -> Int64.sub n1 n2
   | T.Times -> Int64.mul n1 n2
@@ -70,9 +92,21 @@ let do_op op (n1 : Int64.t) (n2 : Int64.t) : Int64.t = match op with
 (* Compute the value of an expression *)
 let rec interp_exp (store : store_t) (e : exp) : val_t =
   match e with
-  | Ident (i, [], _) -> Strmap.find i store
-  | Ident (i, indices, _) ->
-
+  | Ident (i, [], _) ->
+    Strmap.find i store (* i will be in the store in a well-typed program *)
+  | Ident (i, iexps, _) ->
+    (match Strmap.find i store with
+     | Varray (sizes, a) ->
+       (let indices =
+          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
+        in
+        match array_address sizes indices with
+        | None ->
+          raise (Crash "array index out of bounds")
+        | Some x ->
+          Vint (Array.get a x))
+     | Vint _ ->
+       raise TypeError)
   | Num n -> Vint n
   | Bool b -> Vint (bool_to_int64 b)
   | Oper (e1, (op, _), e2) ->
@@ -81,20 +115,41 @@ let rec interp_exp (store : store_t) (e : exp) : val_t =
        Vint (do_op op n1 n2)
      | _ ->
        raise (Crash "operator given non-integer value"))
+  | Array (iexps, _) ->
+    let indices =
+      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
+    in
+    Varray (indices, Array.make (List.fold_right (fun x y -> x * y) indices 1) 0L)
 
 (* Run a statement *)
-let rec interp_stmt (store : store_t) (s : stmt) : store_t = match s with
-  | Assign (i, e, _) ->
-    let n = interp_exp store e in
-    Strmap.add i n store
+let rec interp_stmt (store : store_t) (s : stmt) : store_t =
+  match s with
+  | Assign (i, [], e, _) ->
+    let v = interp_exp store e in
+    Strmap.add i v store
+  | Assign (i, iexps, e, _) ->
+    (match Strmap.find i store with
+     | Varray (sizes, a) ->
+       (let indices =
+          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
+        in
+        match array_address sizes indices with
+        | None ->
+          raise (Crash "array index out of bounds")
+        | Some x ->
+          let v = val_t_to_int (interp_exp store e) in
+          Array.set a x v;
+          store)
+     | Vint _ ->
+       raise TypeError)
   | While (e, body_s, loc) ->
-    if not (int64_to_bool (interp_exp store e)) then
+    if not (int64_to_bool (val_t_to_int (interp_exp store e))) then
       store
     else
       let store2 = interp_stmt store body_s in
       interp_stmt store2 s
   | Ite (e, s1, s2, _) ->
-    if int64_to_bool (interp_exp store e) then
+    if int64_to_bool (val_t_to_int (interp_exp store e)) then
       interp_stmt store s1
     else
       interp_stmt store s2
@@ -104,28 +159,31 @@ let rec interp_stmt (store : store_t) (s : stmt) : store_t = match s with
     Printf.printf "> ";
     (try
        let n = Int64.of_string (read_line ()) in
-       Strmap.add i n store
+       Strmap.add i (Vint n) store
      with Failure _ -> raise (BadInput "not a 64-bit integer"))
   | Out (i, _) ->
     begin
-      print_string (Int64.to_string (Strmap.find i store));
+      print_string (Int64.to_string (val_t_to_int (Strmap.find i store)));
       print_newline ();
       store
     end
+
 and interp_stmts (store : store_t) (sl : stmt list) : store_t = match sl with
   | [] -> store
   | s::sl ->
     let store2 = interp_stmt store s in
     interp_stmts store2 sl;;
 
+(* ---------- Driver code for the interpreter ------------ *)
+
 let filename = ref None;;
 
-let usage_msg = 
-  "example interpreter \nexample usage:       interp.byte test.expl\n";; 
-    
-let _ = 
+let usage_msg =
+  "example interpreter \nexample usage:       interp.byte test.expl\n";;
+
+let _ =
   Arg.parse []
-    (fun s -> 
+    (fun s ->
        match !filename with
        | None ->
          filename := Some s
@@ -134,7 +192,7 @@ let _ =
           exit 1))
     usage_msg;;
 
-let _ = 
+let _ =
   match !filename with
   | None ->
     (print_string usage_msg;

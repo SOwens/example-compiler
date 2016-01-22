@@ -16,7 +16,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-type op = 
+(* The language's tokens, and a simple lexer *)
+
+type op =
   | Plus
   | Minus
   | Times
@@ -29,11 +31,11 @@ type op =
   | Lshift
   | BitOr
   | BitAnd
-      [@@deriving show]
+  [@@deriving show]
 
 val op_to_string : op -> string
 
-type token = 
+type token =
   | Num of Int64.t
   | Ident of string
   | Op of op
@@ -53,9 +55,9 @@ type token =
   | Input
   | Output
   | Array
-      [@@deriving show]
+  [@@deriving show]
 
 type tok_loc = (token * int)
-    [@@deriving show]
+  [@@deriving show]
 
 val lex : string -> int -> int -> tok_loc list

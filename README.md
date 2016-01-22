@@ -44,6 +44,11 @@ Numbers are sequences of digits that fit into a 64-bit signed integer.
 
 All numerical operations are on signed, 2s complement 64-bit integers.
 
+Multi-dimensional arrays are supported. Array elements are 64-bit integers.
+
+Variables aren't separately declared, but a variable is only in scope inside of
+the curly braces that it was first assigned in.
+
 op ::=  
 | `+`  --- Addition  
 | `-`  --- Subtraction  
@@ -86,4 +91,4 @@ stmts ::=
 | epsilon  
 | stmt stmts
 
-A program is just a stmt.
+A program is just a stmts.

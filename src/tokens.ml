@@ -16,6 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* The language's tokens, and a simple lexer *)
+
 open Util
 
 (* Regular expressions that describe various syntactic entities *)
@@ -39,7 +41,7 @@ type op =
   | Lshift
   | BitOr
   | BitAnd
-      [@@deriving show]
+  [@@deriving show]
 
 let op_to_string op =
   match op with
@@ -76,10 +78,10 @@ type token =
   | Input
   | Output
   | Array
-      [@@deriving show]
+  [@@deriving show]
 
 type tok_loc = (token * int)
-    [@@ deriving show]
+  [@@ deriving show]
 
 let keywords =
   [("while",While); ("if",If); ("then",Then); ("else",Else); ("array",Array); (":=",Assign);
@@ -140,4 +142,3 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
                      String.sub s pos 1 ^
                      "' on line " ^
                      string_of_int line_n))
-

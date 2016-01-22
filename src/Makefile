@@ -1,4 +1,4 @@
-PACKAGES = ppx_deriving.show,extlib,str,ppx_monadic,ppx_deriving_ord
+PACKAGES = ppx_deriving.show,extlib,str,ppx_monadic,ppx_deriving.ord
 
 FILES = util tokens sourceAst typeCheck frontEnd removeBool constProp \
 blockStructure shrinkImmediates liveVarAnalysis regAlloc lineariseCfg x86 \

@@ -16,20 +16,23 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* The front end packaging lexing, parsing and type checking *)
+
 open Util
 
 let front_end (filename : string) (print_intermediates : bool) : SourceAst.stmt list =
-  let p s =
-    if print_intermediates then
-      Printf.printf "%s\n" s
-    else ()
-  in
   if Filename.check_suffix filename ".expl" then
     let input = Std.input_file filename in
     let toks = Tokens.lex input 0 1 in
-    p ([%show: Tokens.tok_loc list] toks);
+    if print_intermediates then
+      Format.printf "%a@\n@\n" (pp_list Tokens.pp_tok_loc) toks
+    else
+      ();
     let ast = SourceAst.parse_program toks in
-    p ([%show: SourceAst.stmt list] ast);
+    if print_intermediates then
+      Format.printf "%a@\n@\n" (pp_list SourceAst.pp_stmt) ast
+    else
+      ();
     TypeCheck.type_stmts Strmap.empty ast;
     ast
   else

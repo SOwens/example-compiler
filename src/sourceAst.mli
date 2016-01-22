@@ -16,6 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* The langauage's tokens, and a simple lexer *)
+
 module T = Tokens
 type id = string [@@deriving show]
 
@@ -26,8 +28,9 @@ type exp =
   | Bool of bool
   (* the int is the line number of the operator *)
   | Oper of exp * (T.op * int) * exp
-  | Array of exp list
-              [@@deriving show]
+  (* Allocate a new array of given dimensions. Initialise to 0 *)
+  | Array of exp list * int
+  [@@deriving show]
 
 (* the ints are all the line number of the (start of) the stmt *)
 type stmt =
@@ -37,6 +40,6 @@ type stmt =
   | Stmts of stmt list * int
   | In of id * int
   | Out of id * int
-             [@@deriving show]
+  [@@deriving show]
 
 val parse_program : (Tokens.token * int) list -> stmt list
