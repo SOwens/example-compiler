@@ -18,5 +18,8 @@
 
 (* The type checker *)
 
+open SourceAst
+
 type t
-val type_stmts : t Util.Strmap.t -> SourceAst.stmt list -> unit
+val type_stmts : int option -> t Util.Strmap.t -> stmt list -> unit
+val remove_loc : stmt list -> stmt list

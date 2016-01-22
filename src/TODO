@@ -1,2 +1,2 @@
-input and output
+Const prop for x * 2^n -> x shift n
 Make another version of the compiler that includes functions

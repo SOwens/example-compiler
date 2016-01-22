@@ -22,24 +22,22 @@ module T = Tokens
 type id = string [@@deriving show]
 
 type exp =
-  (* the int is the line number of the identifier *)
-  | Ident of id * exp list * int
+  | Ident of id * exp list
   | Num of Int64.t
   | Bool of bool
-  (* the int is the line number of the operator *)
-  | Oper of exp * (T.op * int) * exp
+  | Oper of exp * T.op * exp
   (* Allocate a new array of given dimensions. Initialise to 0 *)
-  | Array of exp list * int
+  | Array of exp list
   [@@deriving show]
 
-(* the ints are all the line number of the (start of) the stmt *)
 type stmt =
-  | Assign of id * exp list * exp * int
-  | While of exp * stmt * int
-  | Ite of exp * stmt * stmt * int
-  | Stmts of stmt list * int
-  | In of id * int
-  | Out of id * int
+  | Assign of id * exp list * exp
+  | While of exp * stmt
+  | Ite of exp * stmt * stmt
+  | Stmts of stmt list
+  | In of id
+  | Out of id
+  | Loc of stmt * int (* annotate a statement with it's source line number *)
   [@@deriving show]
 
 val parse_program : (Tokens.token * int) list -> stmt list

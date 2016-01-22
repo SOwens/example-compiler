@@ -16,6 +16,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* A control flow graph representation with basic blocks, and the source AST ->
+   CGF algorithm *)
+
 type var =
   | Vreg of int
   | Stack of int
@@ -38,7 +41,7 @@ type atomic_exp =
   | Num of Int64.t
         [@@deriving show]
 
-type block_elem = 
+type block_elem =
   | AssignOp of var * atomic_exp * Tokens.op * atomic_exp
   | AssignAtom of var * atomic_exp
   | Ld of var * atomic_exp
@@ -50,7 +53,7 @@ type block_elem =
 type basic_block = block_elem list
     [@@deriving show]
 
-type next_block = 
+type next_block =
   | End
   | Next of int
   (* The first int is the block number if the ident is true, and the second if
@@ -58,7 +61,7 @@ type next_block =
   | Branch of var * int * int
                 [@@deriving show]
 
-type cfg_entry = { bnum : int; elems : block_elem list; next : next_block; 
+type cfg_entry = { bnum : int; elems : block_elem list; next : next_block;
                    mutable started : bool; mutable finished : bool }
     [@@deriving show]
 type cfg = cfg_entry list

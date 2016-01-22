@@ -16,33 +16,93 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Do constant propagation and folding *)
+
 open Util
 open SourceAst
 
-(* Statically evaluate an expression according to the identifier values in env *)
-let rec fold_exp (env : exp Strmap.t) (exp : exp) : exp = 
+let log2 (i : int64) : int option =
+  (* Linear search for the least significant 1 in the binary represenatation.
+     A binary search would be faster, but maybe not worth the hassle? *)
+  let rec f (i : int64) (shifted : int) : int option =
+    if Int64.logand i 0x1L = 0L then
+      f (Int64.shift_right i 1) (shifted + 1)
+    else if i = 0x1L then
+      Some shifted
+    else
+      None
+  in
+  if i > 0L then
+    f i 0
+  else
+    None
+
+(* Statically evaluate an expression according to the identifier values in env,
+   don't try to follow constants in arrays *)
+let rec fold_exp (env : exp Strmap.t) (exp : exp) : exp =
   match exp with
-  | Ident (i, ln) -> 
-    (try Strmap.find i env 
+  | Ident (i, []) ->
+    (try Strmap.find i env
      with Not_found -> exp)
+  | Ident (i, es) ->
+    Ident (i, List.map (fold_exp env) es)
   | Num n -> Num n
   | Bool b -> Bool b
   | Oper (e1, op, e2) ->
     let o1 = fold_exp env e1 in
     let o2 = fold_exp env e2 in
     (match (o1, op, o2) with
-     | (Num n1, (T.Plus, _), Num n2) -> Num (Int64.add n1 n2)
-     | (Num n1, (T.Minus, _), Num n2) -> Num (Int64.sub n1 n2)
-     | (Num n1, (T.Times, _), Num n2) -> Num (Int64.mul n1 n2)
-     | (Num n1, (T.Div, _), Num n2) when n2 <> 0L -> Num (Int64.div n1 n2)
-     | (Num n1, (T.Lt, _), Num n2) -> Bool (n1 < n2)
-     | (Bool b1, (T.And, _), Bool b2) -> Bool (b1 && b2)
-     | (Bool b1, (T.Or, _), Bool b2) -> Bool (b1 || b2)
-     | (Bool b1, (T.Eq, _), Bool b2) -> Bool (b1 = b2)
-     | (Num n1, (T.Eq, _), Num n2) -> Bool (Int64.compare n1 n2 = 0)
-     | (Num n1, (T.Lshift, _), Num n2) -> Num (Int64.shift_left n1 (Int64.to_int n2))
-     | (Num n1, (T.BitOr, _), Num n2) -> Num (Int64.logor n1 n2)
+     | (Num n1, T.Plus, Num n2) -> Num (Int64.add n1 n2)
+     | (Num 0L, T.Plus, e) -> e
+     | (e, T.Plus, Num 0L) -> e
+
+     | (Num n1, T.Minus, Num n2) -> Num (Int64.sub n1 n2)
+     | (e, T.Minus, Num 0L) -> e
+     | (Ident (i1, []), T.Minus, Ident (i2, [])) when i1 = i2 ->
+         Num 0L
+
+     | (Num n1, T.Times, Num n2) -> Num (Int64.mul n1 n2)
+     | (e, T.Times, Num 1L) -> e
+     | (Num 1L, T.Times, e) -> e
+     | (e, T.Times, Num 0L) -> Num 0L
+     | (Num 0L, T.Times, e) -> Num 0L
+     (* TODO powers of 2 into shifts *)
+
+     | (Num n1, T.Div, Num n2) when n2 <> 0L -> Num (Int64.div n1 n2)
+     | (e, T.Div, Num 1L) -> e
+     (* TODO powers of 2 into shifts *)
+
+     | (Num n1, T.Lt, Num n2) -> Bool (Int64.compare n1 n2 < 0)
+     | (Ident (i1, []), T.Lt, Ident (i2, [])) when i1 = i2 ->
+       Bool false
+
+     | (Num n1, T.Gt, Num n2) -> Bool (Int64.compare n1 n2 > 0)
+     | (Ident (i1, []), T.Gt, Ident (i2, [])) when i1 = i2 ->
+       Bool false
+
+     | (Num n1, T.Eq, Num n2) -> Bool (Int64.compare n1 n2 = 0)
+     | (Ident (i1, []), T.Eq, Ident (i2, [])) when i1 = i2 ->
+       Bool true
+
+     | (Num n1, T.Lshift, Num n2) -> Num (Int64.shift_left n1 (Int64.to_int n2))
+     | (e, T.Lshift, Num 0L) -> e
+     | (Num 0L, T.Lshift, e) -> Num 0L
+
+     | (Num n1, T.BitOr, Num n2) -> Num (Int64.logor n1 n2)
+     | (Num 0L, T.BitOr, e) -> e
+     | (e, T.BitOr, Num 0L) -> e
+     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitOr, e) -> Num 0xFFFFFFFFFFFFFFFFL
+     | (e, T.BitOr, Num 0xFFFFFFFFFFFFFFFFL) -> Num 0xFFFFFFFFFFFFFFFFL
+
+     | (Num n1, T.BitAnd, Num n2) -> Num (Int64.logand n1 n2)
+     | (Num 0L, T.BitAnd, e) -> Num 0L
+     | (e, T.BitAnd, Num 0L) -> Num 0L
+     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitAnd, e) -> e
+     | (e, T.BitAnd, Num 0xFFFFFFFFFFFFFFFFL) -> e
+
      | _ -> Oper (o1, op, o2))
+  | Array es ->
+    Array (List.map (fold_exp env) es)
 
 let is_const (e : exp) : bool =
   match e with
@@ -55,8 +115,8 @@ let same_const (e1 : exp) (e2 : exp) : bool =
   | (Bool b1, Bool b2) -> b1 = b2
   | _ -> false
 
-(* If v1 and v2 contain the same constant, return it. Otherwise return None *) 
-let merge_constants (id : id) (v1 : exp option) (v2 : exp option) : exp option = 
+(* If v1 and v2 contain the same constant, return it. Otherwise return None *)
+let merge_constants (id : id) (v1 : exp option) (v2 : exp option) : exp option =
   match (v1,v2) with
   | (Some e1, Some e2) ->
     if same_const e1 e2 then
@@ -67,36 +127,41 @@ let merge_constants (id : id) (v1 : exp option) (v2 : exp option) : exp option =
 (* Do constant propagation. Accumulate an environment of definitely known
    constants at the end of stmts, given definitely known constants env at the
    start. *)
-let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stmt list = 
+let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stmt list =
   match stmts with
   | [] -> (env,[])
-  | In (x,ln) :: stmts -> 
+  | In x :: stmts ->
     let (env',stmts') = prop_stmts (Strmap.remove x env) stmts in
-    (env', In (x, ln) :: stmts')
-  | Out (x,ln) :: stmts -> 
+    (env', In x :: stmts')
+  | Out x :: stmts ->
     let (env',stmts') = prop_stmts env stmts in
-    (env', Out (x, ln) :: stmts')
-  | Assign (x, e, ln) :: stmts -> 
+    (env', Out x :: stmts')
+  | Assign (x, [], e) :: stmts ->
     let o1 = fold_exp env e in
-    let first_env = 
-      if is_const o1 then Strmap.add x o1 env else Strmap.remove x env 
+    let first_env =
+      if is_const o1 then Strmap.add x o1 env else Strmap.remove x env
     in
     let (env',stmts') = prop_stmts first_env stmts in
-      (env', Assign (x, o1, ln) :: stmts')
-  | While (e, s1, ln) :: stmts ->
+    (env', Assign (x, [], o1) :: stmts')
+  | Assign (x, es, e) :: stmts ->
+    let o = fold_exp env e in
+    let os = List.map (fold_exp env) es in
+    let (env', stmts') = prop_stmts env stmts in
+    (env', Assign (x, os, o) :: stmts')
+  | While (e, s1) :: stmts ->
     let o1 = fold_exp env e in
     (match o1 with
      | Bool false -> prop_stmts env stmts
-     | _ -> 
+     | _ ->
        let (env1,os1) = prop_loop_body env s1 in
        (* have to redo the condition, for the sound constants on entry *)
        let o1 = fold_exp env1 e in
        let (env',stmts') = prop_stmts env1 stmts in
-       (env', While (o1, os1, ln) :: stmts'))
-  | Ite (e, s1, s2, ln) :: stmts ->
+       (env', While (o1, os1) :: stmts'))
+  | Ite (e, s1, s2) :: stmts ->
     let o1 = fold_exp env e in
     (match o1 with
-     | Bool true -> 
+     | Bool true ->
        let (env1, os1) = prop_stmt env s1 in
        let (env', stmts') = prop_stmts env1 stmts in
        (env', os1::stmts')
@@ -104,17 +169,18 @@ let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stm
        let (env2, os2) = prop_stmt env s2 in
        let (env', stmts') = prop_stmts env2 stmts in
        (env', os2::stmts')
-     | _ -> 
+     | _ ->
        let (env1, os1) = prop_stmt env s1 in
        let (env2, os2) = prop_stmt env s2 in
        (* Only include constants that are known to be the same at the end of
           both branches of the Ite for the subsequent statements. *)
        let (env',stmts') = prop_stmts (Strmap.merge merge_constants env1 env2) stmts in
-       (env', Ite (o1, os1, os2, ln) :: stmts'))
-  | Stmts (stmts1, ln) :: stmts ->
+       (env', Ite (o1, os1, os2) :: stmts'))
+  | Stmts (stmts1) :: stmts ->
     let (env1, os1) = prop_stmts env stmts1 in
     let (env', stmts') = prop_stmts env1 stmts in
-    (env', Stmts (os1, ln) :: stmts')
+    (env', Stmts (os1) :: stmts')
+  | Loc _ :: _ -> raise (InternalError "Loc in constProp")
 
 and prop_stmt env stmt =
   match prop_stmts env [stmt] with

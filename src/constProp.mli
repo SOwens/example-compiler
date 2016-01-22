@@ -16,5 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Do constant propagation and folding *)
+
 open SourceAst
 val prop_stmts : exp Util.Strmap.t -> stmt list -> exp Util.Strmap.t * stmt list

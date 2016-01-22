@@ -80,8 +80,8 @@ let do_op op (n1 : int64) (n2 : int64) : int64 =
   | T.Minus -> Int64.sub n1 n2
   | T.Times -> Int64.mul n1 n2
   | T.Div -> Int64.div n1 n2
-  | T.Lt -> bool_to_int64 (Int64.compare n1 n2 = -1)
-  | T.Gt -> bool_to_int64 (Int64.compare n1 n2 = 1)
+  | T.Lt -> bool_to_int64 (Int64.compare n1 n2 < 0)
+  | T.Gt -> bool_to_int64 (Int64.compare n1 n2 > 0)
   | T.Eq -> bool_to_int64 (Int64.compare n1 n2 = 0)
   | T.And -> bool_to_int64 (int64_to_bool n1 && int64_to_bool n2)
   | T.Or -> bool_to_int64 (int64_to_bool n1 || int64_to_bool n2)
@@ -92,9 +92,9 @@ let do_op op (n1 : int64) (n2 : int64) : int64 =
 (* Compute the value of an expression *)
 let rec interp_exp (store : store_t) (e : exp) : val_t =
   match e with
-  | Ident (i, [], _) ->
+  | Ident (i, []) ->
     Strmap.find i store (* i will be in the store in a well-typed program *)
-  | Ident (i, iexps, _) ->
+  | Ident (i, iexps) ->
     (match Strmap.find i store with
      | Varray (sizes, a) ->
        (let indices =
@@ -109,13 +109,13 @@ let rec interp_exp (store : store_t) (e : exp) : val_t =
        raise TypeError)
   | Num n -> Vint n
   | Bool b -> Vint (bool_to_int64 b)
-  | Oper (e1, (op, _), e2) ->
+  | Oper (e1, op, e2) ->
     (match (interp_exp store e1, interp_exp store e2) with
      | (Vint n1, Vint n2) ->
        Vint (do_op op n1 n2)
      | _ ->
        raise (Crash "operator given non-integer value"))
-  | Array (iexps, _) ->
+  | Array iexps ->
     let indices =
       List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
     in
@@ -124,10 +124,10 @@ let rec interp_exp (store : store_t) (e : exp) : val_t =
 (* Run a statement *)
 let rec interp_stmt (store : store_t) (s : stmt) : store_t =
   match s with
-  | Assign (i, [], e, _) ->
+  | Assign (i, [], e) ->
     let v = interp_exp store e in
     Strmap.add i v store
-  | Assign (i, iexps, e, _) ->
+  | Assign (i, iexps, e) ->
     (match Strmap.find i store with
      | Varray (sizes, a) ->
        (let indices =
@@ -142,31 +142,33 @@ let rec interp_stmt (store : store_t) (s : stmt) : store_t =
           store)
      | Vint _ ->
        raise TypeError)
-  | While (e, body_s, loc) ->
+  | While (e, body_s) ->
     if not (int64_to_bool (val_t_to_int (interp_exp store e))) then
       store
     else
       let store2 = interp_stmt store body_s in
       interp_stmt store2 s
-  | Ite (e, s1, s2, _) ->
+  | Ite (e, s1, s2) ->
     if int64_to_bool (val_t_to_int (interp_exp store e)) then
       interp_stmt store s1
     else
       interp_stmt store s2
-  | Stmts (sl, _) ->
+  | Stmts sl ->
     interp_stmts store sl
-  | In (i, _) ->
+  | In i ->
     Printf.printf "> ";
     (try
        let n = Int64.of_string (read_line ()) in
        Strmap.add i (Vint n) store
      with Failure _ -> raise (BadInput "not a 64-bit integer"))
-  | Out (i, _) ->
+  | Out i ->
     begin
       print_string (Int64.to_string (val_t_to_int (Strmap.find i store)));
       print_newline ();
       store
     end
+  | Loc _ ->
+    raise (InternalError "Location annotation in interp")
 
 and interp_stmts (store : store_t) (sl : stmt list) : store_t = match sl with
   | [] -> store

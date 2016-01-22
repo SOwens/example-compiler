@@ -33,7 +33,7 @@ let front_end (filename : string) (print_intermediates : bool) : SourceAst.stmt 
       Format.printf "%a@\n@\n" (pp_list SourceAst.pp_stmt) ast
     else
       ();
-    TypeCheck.type_stmts Strmap.empty ast;
+    TypeCheck.type_stmts None Strmap.empty ast;
     ast
   else
     (Format.printf "Expects filename ending in .expl\n";

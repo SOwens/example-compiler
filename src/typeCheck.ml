@@ -31,19 +31,24 @@ type t =
 type env_t = t Strmap.t
 
 (* Raise a type error *)
-let type_error (ln : int) (msg : string) : 'a =
-  raise (BadInput ("Line " ^ string_of_int ln ^ ": " ^ msg))
+let type_error (ln : int option) (msg : string) : 'a =
+  match ln with
+  Some ln ->
+    raise (BadInput ("Type error on line " ^ string_of_int ln ^ ": " ^ msg))
+  | None ->
+    raise (BadInput ("Type error at unknown location: " ^ msg))
+
 
 (* Compute the type of an expression, or raise BadInput if there is a type error *)
-let rec type_exp (env : env_t) (e : exp) : t =
+let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
   match e with
-  | Ident (i, es, ln) ->
+  | Ident (i, es) ->
     let t =
       try Strmap.find i env
       with Not_found ->
         type_error ln ("Uninitialised variable " ^ i)
     in
-    let ts = List.map (type_exp env) es in
+    let ts = List.map (type_exp ln env) es in
     let l = List.length ts in
     (match t with
      | Tarray num_dims ->
@@ -62,16 +67,16 @@ let rec type_exp (env : env_t) (e : exp) : t =
   | Num n -> Tint
   | Bool b -> Tbool
   | Oper (e1, op, e2) ->
-    let t1 = type_exp env e1 in
-    let t2 = type_exp env e2 in
+    let t1 = type_exp ln env e1 in
+    let t2 = type_exp ln env e2 in
     (match (t1, op, t2) with
-     | (Tbool, ((T.And | T.Or), _), Tbool) -> Tbool
-     | (Tint, ((T.Plus | T.Minus | T.Times | T.Div | T.Lshift | T.BitOr | T.BitAnd), _), Tint) -> Tint
-     | (Tint, ((T.Lt | T.Eq | T.Gt), _), Tint) -> Tbool
-     | (_, (op, ln), _) ->
+     | (Tbool, (T.And | T.Or), Tbool) -> Tbool
+     | (Tint, (T.Plus | T.Minus | T.Times | T.Div | T.Lshift | T.BitOr | T.BitAnd), Tint) -> Tint
+     | (Tint, (T.Lt | T.Eq | T.Gt), Tint) -> Tbool
+     | (_, op, _) ->
        type_error ln ("Type error on operator " ^ T.show_op op))
-  | Array (es, ln) ->
-    let ts = List.map (type_exp env) es in
+  | Array es ->
+    let ts = List.map (type_exp ln env) es in
     let l = List.length ts in
     if l = 0 then
       type_error ln "Array must have at least 1 dimension"
@@ -83,7 +88,7 @@ let rec type_exp (env : env_t) (e : exp) : t =
 (* Type check an identifier being assigned to.
    If it is already assigned, check its type. If it has not been assigned,
    extend the type environment *)
-let type_lhs_ident (env :env_t) (x : id) (t : t) (ln : int) : env_t =
+let type_lhs_ident (env :env_t) (x : id) (t : t) (ln : int option) : env_t =
   try
     if Strmap.find x env = t then
       env
@@ -95,44 +100,61 @@ let type_lhs_ident (env :env_t) (x : id) (t : t) (ln : int) : env_t =
 (* Type check a list of statements. Raise BadInput if there is an error.  Check
    a list so that earlier assignment statements can extend the environment for
    later statements *)
-let rec type_stmts (env :env_t) (stmts : stmt list) : unit =
+let rec type_stmts (ln : int option) (env :env_t) (stmts : stmt list) : unit =
   match stmts with
   | [] -> ()
-  | In (x, ln) :: stmts' ->
+  | In x :: stmts' ->
     let env' = type_lhs_ident env x Tint ln in
-    type_stmts env' stmts'
-  | Out (x, ln) :: stmts' ->
+    type_stmts ln env' stmts'
+  | Out x :: stmts' ->
     if Strmap.find x env = Tint then
-      type_stmts env stmts'
+      type_stmts ln env stmts'
     else
       type_error ln "Output with non-integer type"
-  | Assign (x, [], e, ln) :: stmts' ->
-    let t = type_exp env e in
+  | Assign (x, [], e) :: stmts' ->
+    let t = type_exp ln env e in
     let env' = type_lhs_ident env x t ln in
-    type_stmts env' stmts'
-  | Assign (x, es, e, ln) :: stmts' ->
+    type_stmts ln env' stmts'
+  | Assign (x, es, e) :: stmts' ->
     (* Assignments to arrays require the lhs to be checkable as an expression.
        In particular, the identifier must already be bound to an array type of
        the correct dimension. *)
-    let t1 = type_exp env (Ident (x, es, ln)) in
-    let t2 = type_exp env e in
+    let t1 = type_exp ln env (Ident (x, es)) in
+    let t2 = type_exp ln env e in
     if t1 = t2 then
-      type_stmts env stmts'
+      type_stmts ln env stmts'
     else
       type_error ln "Array assignment type mismatch"
-  | While (e, s, ln) :: stmts ->
-    if type_exp env e = Tbool then
-      (type_stmts env [s];
-       type_stmts env stmts)
+  | While (e, s) :: stmts ->
+    if type_exp ln env e = Tbool then
+      (type_stmts ln env [s];
+       type_stmts ln env stmts)
     else
       type_error ln "While test of non-bool type"
-  | Ite (e, s1, s2, ln) :: stmts ->
-    if type_exp env e = Tbool then
-      (type_stmts env [s1];
-       type_stmts env [s2];
-       type_stmts env stmts)
+  | Ite (e, s1, s2) :: stmts ->
+    if type_exp ln env e = Tbool then
+      (type_stmts ln env [s1];
+       type_stmts ln env [s2];
+       type_stmts ln env stmts)
     else
       type_error ln "If test of non-bool type"
-  | Stmts (s_list, ln) :: stmts' ->
-    type_stmts env s_list;
-    type_stmts env stmts'
+  | Stmts (s_list) :: stmts' ->
+    (type_stmts ln env s_list;
+     type_stmts ln env stmts')
+  | Loc (s, ln') :: stmts' ->
+    (type_stmts (Some ln') env [s];
+     type_stmts ln env stmts')
+
+let rec remove_loc (stmts : stmt list) : stmt list =
+  List.map remove_loc_one stmts
+
+and remove_loc_one s =
+  match s with
+  | While (e, s) ->
+    While (e, remove_loc_one s)
+  | Ite (e, s1, s2) ->
+    Ite (e, remove_loc_one s1, remove_loc_one s2)
+  | Stmts s ->
+    Stmts (remove_loc s)
+  | Loc (s, _) -> s
+  | s -> s

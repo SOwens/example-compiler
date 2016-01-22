@@ -30,21 +30,21 @@ module T = Tokens
    x := e1 && e2 --> x := e1; if x then x := e2 else {}
    x := e1 || e2 --> x := e1; if x then {} else x := e2
 *)
-let rec remove_and_or_exp (id : id) (loc : int) (e : exp) : stmt list =
+let rec remove_and_or_exp (id : id) (e : exp) : stmt list =
   match e with
-  | Bool true -> [Assign (id, [], Num 1L, loc)]
-  | Bool false -> [Assign (id, [], Num 0L, loc)]
-  | Oper (e1, (T.And, loc2), e2) ->
-    remove_and_or_exp id loc e1 @
-    [Ite (Ident (id, [], loc), Stmts (remove_and_or_exp id loc e2, loc), Stmts ([], loc), loc)]
-  | Oper (e1, (T.Or, loc2), e2) ->
-    remove_and_or_exp id loc e1 @
-    [Ite (Ident (id, [], loc), Stmts ([], loc), Stmts (remove_and_or_exp id loc e2, loc), loc)]
-  | _ -> [Assign (id, [], e, loc)]
+  | Bool true -> [Assign (id, [], Num 1L)]
+  | Bool false -> [Assign (id, [], Num 0L)]
+  | Oper (e1, T.And, e2) ->
+    remove_and_or_exp id e1 @
+    [Ite (Ident (id, []), Stmts (remove_and_or_exp id e2), Stmts [])]
+  | Oper (e1, T.Or, e2) ->
+    remove_and_or_exp id e1 @
+    [Ite (Ident (id, []), Stmts [], Stmts (remove_and_or_exp id e2))]
+  | _ -> [Assign (id, [], e)]
 
 let is_and_or_exp (e : exp) : bool =
   match e with
-  | Oper (_, ((T.And | T.Or), _), _) -> true
+  | Oper (_, (T.And | T.Or), _) -> true
   | _ -> false
 
 (* Assume that the program can't use __tmp as a variable, and the the compiler
@@ -58,40 +58,42 @@ let is_and_or_exp (e : exp) : bool =
 *)
 let rec remove_and_or_stmt (s : stmt) : stmt list =
   match s with
-  | Assign (id, [], e, loc) ->
-    remove_and_or_exp id loc e
-  | While (e, s, loc) ->
+  | Assign (id, [], e) ->
+    remove_and_or_exp id e
+  | While (e, s) ->
     let sl = remove_and_or_stmt s in
     if is_and_or_exp e then
-      let tmp_eq_e = remove_and_or_exp "__tmp" loc e in
+      let tmp_eq_e = remove_and_or_exp "__tmp" e in
       tmp_eq_e @
-      [While (Ident ("__tmp", [], loc), Stmts (sl @ tmp_eq_e, loc), loc)]
+      [While (Ident ("__tmp", []), Stmts (sl @ tmp_eq_e))]
     else
       (match sl with
-       | [s] -> [While (e, s, loc)]
-       | _ -> [While (e, Stmts (sl, loc), loc)])
-  | Ite (e, s1, s2, loc) ->
+       | [s] -> [While (e, s)]
+       | _ -> [While (e, Stmts sl)])
+  | Ite (e, s1, s2) ->
     let sl1 = remove_and_or_stmt s1 in
     let sl2 = remove_and_or_stmt s2 in
     let s1' =
       match sl1 with
       | [x] -> x
-      | _ -> Stmts (sl1, loc)
+      | _ -> Stmts (sl1)
     in
     let s2' =
       match sl2 with
       | [x] -> x
-      | _ -> Stmts (sl2, loc)
+      | _ -> Stmts (sl2)
     in
     if is_and_or_exp e then
-      remove_and_or_exp "__tmp" loc e @ [Ite (Ident ("__tmp", [], loc), s1', s2', loc)]
+      remove_and_or_exp "__tmp" e @ [Ite (Ident ("__tmp", []), s1', s2')]
     else
-      [Ite (e, s1', s2', loc)]
-  | Stmts (sl, loc) ->
+      [Ite (e, s1', s2')]
+  | Stmts sl ->
     List.flatten (List.map remove_and_or_stmt sl)
   | In _ | Out _ | Assign _ ->
     (* Cannot contain any && or || expressions because of the type system *)
     [s]
+  | Loc _ ->
+    raise (Util.InternalError "Loc in removeBool")
 
 and remove_and_or (sl : stmt list) : stmt list =
   List.flatten (List.map remove_and_or_stmt sl)
