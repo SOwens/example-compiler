@@ -16,5 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Convert booleans to integers and remove all && and || expressions with
+   proper short circuit evaluation *)
+
 open SourceAst
 val remove_and_or : stmt list -> stmt list

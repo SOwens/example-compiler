@@ -16,29 +16,31 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Convert booleans to integers and remove all && and || expressions with
+   proper short circuit evaluation *)
+
 open SourceAst
 module T = Tokens
 
-(* Get rid of &&, ||, and = expressions, rely on the fact that they have to be
-   at the top level of an expressions (due to the type system), so we don't
-   have to worry about 1 + (a && b) etc. Necessary to support short-circuit
-   evaluation. 
+(* Get rid of booleans, &&, and || on the right of an assignment. Rely on
+   the fact that they have to be at the top level of an expression (due to the
+   type system), so we don't have to worry about 1 + (a && b) etc. Necessary to
+   support short-circuit evaluation.
 
-   x := e1 && e2 --> x := e1; if x then x := e2 else {} 
+   x := e1 && e2 --> x := e1; if x then x := e2 else {}
    x := e1 || e2 --> x := e1; if x then {} else x := e2
-
 *)
-let rec remove_and_or_exp (id : id) (loc : int) (e : exp) : stmt list = 
+let rec remove_and_or_exp (id : id) (loc : int) (e : exp) : stmt list =
   match e with
-  | Bool true -> [Assign (id, Num 1L, loc)]
-  | Bool false -> [Assign (id, Num 0L, loc)]
+  | Bool true -> [Assign (id, [], Num 1L, loc)]
+  | Bool false -> [Assign (id, [], Num 0L, loc)]
   | Oper (e1, (T.And, loc2), e2) ->
     remove_and_or_exp id loc e1 @
-    [Ite (Ident (id,loc), Stmts (remove_and_or_exp id loc e2, loc), Stmts ([], loc), loc)]
+    [Ite (Ident (id, [], loc), Stmts (remove_and_or_exp id loc e2, loc), Stmts ([], loc), loc)]
   | Oper (e1, (T.Or, loc2), e2) ->
     remove_and_or_exp id loc e1 @
-    [Ite (Ident (id,loc), Stmts ([], loc), Stmts (remove_and_or_exp id loc e2, loc), loc)]
-  | _ -> [Assign (id, e, loc)]
+    [Ite (Ident (id, [], loc), Stmts ([], loc), Stmts (remove_and_or_exp id loc e2, loc), loc)]
+  | _ -> [Assign (id, [], e, loc)]
 
 let is_and_or_exp (e : exp) : bool =
   match e with
@@ -46,7 +48,7 @@ let is_and_or_exp (e : exp) : bool =
   | _ -> false
 
 (* Assume that the program can't use __tmp as a variable, and the the compiler
-   won't use it elsewhere 
+   won't use it elsewhere
 
    if e is an && or || expression, do the following, else expand __tmp = e
 
@@ -56,17 +58,40 @@ let is_and_or_exp (e : exp) : bool =
 *)
 let rec remove_and_or_stmt (s : stmt) : stmt list =
   match s with
-  | Assign (id, e, loc) -> 
+  | Assign (id, [], e, loc) ->
     remove_and_or_exp id loc e
-  | While (e, s, loc) when is_and_or_exp e ->
-    let tmp_eq_e = remove_and_or_exp "__tmp" loc e in
-    tmp_eq_e @
-    [While (Ident ("__tmp", loc), Stmts (s :: tmp_eq_e, loc), loc)]
-  | Ite (e, s1, s2, loc) when is_and_or_exp e ->
-    remove_and_or_exp "__tmp" loc e @ [Ite (Ident ("__tmp", loc), s1, s2, loc)]
+  | While (e, s, loc) ->
+    let sl = remove_and_or_stmt s in
+    if is_and_or_exp e then
+      let tmp_eq_e = remove_and_or_exp "__tmp" loc e in
+      tmp_eq_e @
+      [While (Ident ("__tmp", [], loc), Stmts (sl @ tmp_eq_e, loc), loc)]
+    else
+      (match sl with
+       | [s] -> [While (e, s, loc)]
+       | _ -> [While (e, Stmts (sl, loc), loc)])
+  | Ite (e, s1, s2, loc) ->
+    let sl1 = remove_and_or_stmt s1 in
+    let sl2 = remove_and_or_stmt s2 in
+    let s1' =
+      match sl1 with
+      | [x] -> x
+      | _ -> Stmts (sl1, loc)
+    in
+    let s2' =
+      match sl2 with
+      | [x] -> x
+      | _ -> Stmts (sl2, loc)
+    in
+    if is_and_or_exp e then
+      remove_and_or_exp "__tmp" loc e @ [Ite (Ident ("__tmp", [], loc), s1', s2', loc)]
+    else
+      [Ite (e, s1', s2', loc)]
   | Stmts (sl, loc) ->
     List.flatten (List.map remove_and_or_stmt sl)
-  | s -> [s]
+  | In _ | Out _ | Assign _ ->
+    (* Cannot contain any && or || expressions because of the type system *)
+    [s]
 
-let rec remove_and_or (s : stmt list) : stmt list =
-  List.flatten (List.map remove_and_or_stmt s)
+and remove_and_or (sl : stmt list) : stmt list =
+  List.flatten (List.map remove_and_or_stmt sl)
