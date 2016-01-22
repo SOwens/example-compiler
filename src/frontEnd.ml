@@ -34,7 +34,7 @@ let front_end (filename : string) (print_intermediates : bool) : SourceAst.stmt 
     else
       ();
     TypeCheck.type_stmts None Strmap.empty ast;
-    ast
+    TypeCheck.remove_loc ast
   else
     (Format.printf "Expects filename ending in .expl\n";
      exit 1)

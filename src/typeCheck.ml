@@ -142,8 +142,7 @@ let rec type_stmts (ln : int option) (env :env_t) (stmts : stmt list) : unit =
     (type_stmts ln env s_list;
      type_stmts ln env stmts')
   | Loc (s, ln') :: stmts' ->
-    (type_stmts (Some ln') env [s];
-     type_stmts ln env stmts')
+    type_stmts (Some ln') env (s :: stmts')
 
 let rec remove_loc (stmts : stmt list) : stmt list =
   List.map remove_loc_one stmts
@@ -156,5 +155,5 @@ and remove_loc_one s =
     Ite (e, remove_loc_one s1, remove_loc_one s2)
   | Stmts s ->
     Stmts (remove_loc s)
-  | Loc (s, _) -> s
+  | Loc (s, _) -> remove_loc_one s
   | s -> s
