@@ -74,7 +74,7 @@ let pp_byte_reg fmt r =
 
 type rm = 
   | Zr of reg                                          (* register *)
-  | Zm of (int * reg) option * reg option * Int64.t option (* mem[2^{scale} * index + base + displacement] *)
+  | Zm of (int * reg) option * reg option * int64 option (* mem[2^{scale} * index + base + displacement] *)
 
 let rec simple_add_exp fmt l =
   match l with
@@ -94,7 +94,7 @@ let pp_rm fmt rm =
                       option_map Int64.to_string disp]
 
 type dest_src = 
-  | Zrm_i of rm  * Int64.t  (* mnemonic r/mXX, immXX (sign-extended) *)
+  | Zrm_i of rm  * int64  (* mnemonic r/mXX, immXX (sign-extended) *)
   | Zrm_r of rm  * reg    (* mnemonic r/mXX, rXX *)
   | Zr_rm of reg * rm     (* mnemonic rXX, r/mXX *)
 
@@ -115,7 +115,7 @@ let pp_dest_src fmt ds =
 
 type imm_rm = 
   | Zi_rm of rm      (* r/mXX *)
-  | Zi    of Int64.t   (* sign-extended immediate *) 
+  | Zi    of int64   (* sign-extended immediate *) 
 
 let pp_imm_rm fmt ir = 
   match ir with
@@ -189,13 +189,13 @@ type instruction =
   | Zxadd      of rm * reg
   | Zxchg      of rm * reg
    *)
-  | Zimul      of reg * rm * Int64.t option (* either reg := reg * rm; or reg := rm * int *)
+  | Zimul      of reg * rm * int64 option (* either reg := reg * rm; or reg := rm * int *)
   | Zidiv      of rm (* RAX := RDX,RAX / rm; RDX := RDX,RAX mod rm *)
   | Zlea       of dest_src
   | Zpop       of rm
   | Zpush      of imm_rm
   | Zcall      of string
-  | Zret       of Int64.t
+  | Zret       of int64
   | Zcpuid
   | Zmov       of dest_src
   (* | Zmovzx     of dest_src *)
@@ -204,7 +204,7 @@ type instruction =
   | Zset       of cond * byte_reg   (* Set operates on a byte of memory or
                                        register. Here, we'll only use registers
                                     *) 
-  (* | Zloop      of cond * Int64.t    (* Here Zcond over approximates possibilities. *) *)
+  (* | Zloop      of cond * int64    (* Here Zcond over approximates possibilities. *) *)
 
 let pp_instruction fmt i = 
   match i with

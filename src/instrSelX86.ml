@@ -19,7 +19,7 @@
 open BlockStructure
 open X86
 module L = LineariseCfg
-module T = Tokens 
+module T = Tokens
 
 let tok_to_binop t =
   match t with
@@ -29,7 +29,7 @@ let tok_to_binop t =
   | T.BitOr -> Zor
   | T.BitAnd -> Zand
   | _ -> assert false
-  
+
 let num_regs = 11
 
 (* Save RSP and RBP for stack stuff,
@@ -54,7 +54,7 @@ let var_to_rm v =
   match v with
   | Vreg i -> Zr (List.assoc i reg_numbers)
   | Stack i -> Zm (None, Some RBP, Some (Int64.of_int (-8 * (i+1))))
-  | _ -> assert false (* Register allocation should have removed all named variables *)
+  | _ -> raise (Util.InternalError "named variable in instrSelX86")
 
 (* Build the operation for r := r op ae *)
 let build_to_reg_op op r ae =
@@ -78,9 +78,9 @@ let build_to_reg_op op r ae =
      Zmov (Zrm_i (Zr r, i));
      Zidiv (Zr r);
      Zmov (Zr_rm (r, Zr RAX))]
-  | ((T.Lt | T.Gt | T.Eq), _) -> 
+  | ((T.Lt | T.Gt | T.Eq), _) ->
     assert false
-  | ((T.And | T.Or), _) -> 
+  | ((T.And | T.Or), _) ->
     assert false
 
 (* Assume that we have kept RAX free for scratch space *)
@@ -127,9 +127,9 @@ let rec be_to_x86 (underscore_labels : bool) be =
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     be_to_x86 underscore_labels (AssignOp (v, ae2, invert_op op, Num imm)) (* constant prop ensures both aren't immediate *)
   | AssignOp (v, Ident v2, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
-    let cmp_instr = 
-      match ae2 with 
-      | Num i -> 
+    let cmp_instr =
+      match ae2 with
+      | Num i ->
         [Zbinop (Zcmp, Zrm_i (var_to_rm v2, i))]
       | Ident v3 ->
         (match (var_to_rm v2, var_to_rm v3) with
@@ -170,7 +170,7 @@ let rec be_to_x86 (underscore_labels : bool) be =
        build_to_reg_op op r_scratch ae2 @
        [Zmov (Zrm_r (m1, r_scratch))])
   | AssignOp (_, _, (T.And | T.Or), _) ->
-    assert false (* Should have been removed in the removeBool phase *)
+    raise (Util.InternalError "And/Or in instrSelX86")
   | AssignAtom (v, ae) ->
     (* Essentially special casing the AssignOp case above *)
     (match (var_to_rm v, ae) with
@@ -188,21 +188,21 @@ let rec be_to_x86 (underscore_labels : bool) be =
            Zmov (Zrm_r (m1, r_scratch))]))
   | Ld _ | St _ -> assert false (* TODO *)
   | In v ->
-    caller_save @ 
+    caller_save @
     [Zcall ((if underscore_labels then "_" else "") ^ "input")] @
     caller_restore @
     [Zmov (Zrm_r (var_to_rm v, RAX))]
-  | Out v -> 
-    caller_save @ 
+  | Out v ->
+    caller_save @
     [Zmov (Zr_rm (RDI, var_to_rm v));
      Zcall ((if underscore_labels then "_" else "") ^ "output")] @
     caller_restore
 
 let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int) : instruction list =
   (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
-  let num_stack = 
+  let num_stack =
     if num_stack mod 2 = 0 then
-      num_stack 
+      num_stack
     else
       num_stack + 1
   in

@@ -26,7 +26,7 @@ type id = string [@@deriving show]
 (* AST of expressions *)
 type exp =
   | Ident of id * exp list
-  | Num of Int64.t
+  | Num of int64
   | Bool of bool
   | Oper of exp * T.op * exp
   (* Allocate a new array of given dimensions. Initialise to 0 *)

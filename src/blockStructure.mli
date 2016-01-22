@@ -24,7 +24,7 @@ type var =
   | Stack of int
   | NamedSource of string
   | NamedTmp of int
-        [@@deriving show]
+  [@@deriving show]
 
 module Varset : sig
   include Set.S with type elt = var
@@ -38,8 +38,8 @@ end
 
 type atomic_exp =
   | Ident of var
-  | Num of Int64.t
-        [@@deriving show]
+  | Num of int64
+  [@@deriving show]
 
 type block_elem =
   | AssignOp of var * atomic_exp * Tokens.op * atomic_exp
@@ -48,10 +48,10 @@ type block_elem =
   | St of var * atomic_exp
   | In of var
   | Out of var
-        [@@deriving show]
+  [@@deriving show]
 
 type basic_block = block_elem list
-    [@@deriving show]
+  [@@deriving show]
 
 type next_block =
   | End
@@ -59,12 +59,12 @@ type next_block =
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
   | Branch of var * int * int
-                [@@deriving show]
+  [@@deriving show]
 
 type cfg_entry = { bnum : int; elems : block_elem list; next : next_block;
                    mutable started : bool; mutable finished : bool }
-    [@@deriving show]
+  [@@deriving show]
 type cfg = cfg_entry list
-    [@@deriving show]
+  [@@deriving show]
 
 val build_cfg : SourceAst.stmt list -> cfg

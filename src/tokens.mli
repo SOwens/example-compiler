@@ -36,7 +36,7 @@ type op =
 val op_to_string : op -> string
 
 type token =
-  | Num of Int64.t
+  | Num of int64
   | Ident of string
   | Op of op
   | Lparen

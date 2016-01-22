@@ -59,7 +59,7 @@ let op_to_string op =
   | BitAnd -> "&"
 
 type token =
-  | Num of Int64.t
+  | Num of int64
   | Ident of string
   | Op of op
   | Lparen

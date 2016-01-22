@@ -24,7 +24,7 @@ open BlockStructure
 
 (* Build a series of assignments that puts the immediate n into the dest register, using
    only immediates of 32 bits or smaller *)
-let assign_imm (dest : var) (n : Int64.t) : block_elem list =
+let assign_imm (dest : var) (n : int64) : block_elem list =
   [AssignAtom (dest, Num (Int64.shift_right_logical n 32));
    AssignOp (dest, Ident dest, Tokens.Lshift, Num 32L);
    AssignOp (dest, Ident dest, Tokens.BitOr, Num (Int64.logand n 0x00000000FFFFFFFFL))]
@@ -34,7 +34,7 @@ let is_imm (a : atomic_exp) : bool =
   | Ident _ -> false
   | Num _ -> true
 
-let get_large_imm (a : atomic_exp) : Int64.t option =
+let get_large_imm (a : atomic_exp) : int64 option =
   match a with
   | Num n ->
     let topmost = Int64.shift_right n 31 in
