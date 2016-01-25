@@ -38,7 +38,9 @@ let log2 (i : int64) : int option =
     None
 
 (* Statically evaluate an expression according to the identifier values in env,
-   don't try to follow constants in arrays *)
+   don't try to follow constants in arrays.
+   We don't do anything with associativity or commutativity, so things like
+   (x + 1) + 2 don't get changed. It would be nice to add that. *)
 let rec fold_exp (env : exp Strmap.t) (exp : exp) : exp =
   match exp with
   | Ident (i, []) ->
@@ -53,8 +55,7 @@ let rec fold_exp (env : exp Strmap.t) (exp : exp) : exp =
     let o2 = fold_exp env e2 in
     (match (o1, op, o2) with
      | (Num n1, T.Plus, Num n2) -> Num (Int64.add n1 n2)
-     | (Num 0L, T.Plus, e) -> e
-     | (e, T.Plus, Num 0L) -> e
+     | (Num 0L, T.Plus, e) | (e, T.Plus, Num 0L) -> e
 
      | (Num n1, T.Minus, Num n2) -> Num (Int64.sub n1 n2)
      | (e, T.Minus, Num 0L) -> e
@@ -62,43 +63,38 @@ let rec fold_exp (env : exp Strmap.t) (exp : exp) : exp =
          Num 0L
 
      | (Num n1, T.Times, Num n2) -> Num (Int64.mul n1 n2)
-     | (e, T.Times, Num 1L) -> e
-     | (Num 1L, T.Times, e) -> e
-     | (e, T.Times, Num 0L) -> Num 0L
-     | (Num 0L, T.Times, e) -> Num 0L
-     (* TODO powers of 2 into shifts *)
+     | (e, T.Times, Num 1L) | (Num 1L, T.Times, e) -> e
+     | (Num -1L, T.Times, e) | (e, T.Times, Num -1L) -> Oper (Num 0L, T.Minus, e)
+     | (e, T.Times, Num 0L) | (Num 0L, T.Times, e) -> Num 0L
+     | (e, T.Times, Num n) | (Num n, T.Times, e) ->
+       (match log2 n with
+       | None -> exp
+       | Some log ->
+         Oper (e, T.Lshift, Num (Int64.of_int log)))
 
      | (Num n1, T.Div, Num n2) when n2 <> 0L -> Num (Int64.div n1 n2)
      | (e, T.Div, Num 1L) -> e
-     (* TODO powers of 2 into shifts *)
 
      | (Num n1, T.Lt, Num n2) -> Bool (Int64.compare n1 n2 < 0)
-     | (Ident (i1, []), T.Lt, Ident (i2, [])) when i1 = i2 ->
-       Bool false
+     | (Ident (i1, []), T.Lt, Ident (i2, [])) when i1 = i2 -> Bool false
 
      | (Num n1, T.Gt, Num n2) -> Bool (Int64.compare n1 n2 > 0)
-     | (Ident (i1, []), T.Gt, Ident (i2, [])) when i1 = i2 ->
-       Bool false
+     | (Ident (i1, []), T.Gt, Ident (i2, [])) when i1 = i2 -> Bool false
 
      | (Num n1, T.Eq, Num n2) -> Bool (Int64.compare n1 n2 = 0)
-     | (Ident (i1, []), T.Eq, Ident (i2, [])) when i1 = i2 ->
-       Bool true
+     | (Ident (i1, []), T.Eq, Ident (i2, [])) when i1 = i2 -> Bool true
 
      | (Num n1, T.Lshift, Num n2) -> Num (Int64.shift_left n1 (Int64.to_int n2))
      | (e, T.Lshift, Num 0L) -> e
      | (Num 0L, T.Lshift, e) -> Num 0L
 
      | (Num n1, T.BitOr, Num n2) -> Num (Int64.logor n1 n2)
-     | (Num 0L, T.BitOr, e) -> e
-     | (e, T.BitOr, Num 0L) -> e
-     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitOr, e) -> Num 0xFFFFFFFFFFFFFFFFL
-     | (e, T.BitOr, Num 0xFFFFFFFFFFFFFFFFL) -> Num 0xFFFFFFFFFFFFFFFFL
+     | (Num 0L, T.BitOr, e) | (e, T.BitOr, Num 0L) -> e
+     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitOr, e) | (e, T.BitOr, Num 0xFFFFFFFFFFFFFFFFL) -> Num 0xFFFFFFFFFFFFFFFFL
 
      | (Num n1, T.BitAnd, Num n2) -> Num (Int64.logand n1 n2)
-     | (Num 0L, T.BitAnd, e) -> Num 0L
-     | (e, T.BitAnd, Num 0L) -> Num 0L
-     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitAnd, e) -> e
-     | (e, T.BitAnd, Num 0xFFFFFFFFFFFFFFFFL) -> e
+     | (Num 0L, T.BitAnd, e) | (e, T.BitAnd, Num 0L) -> Num 0L
+     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitAnd, e) | (e, T.BitAnd, Num 0xFFFFFFFFFFFFFFFFL) -> e
 
      | _ -> Oper (o1, op, o2))
   | Array es ->

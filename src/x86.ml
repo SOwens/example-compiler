@@ -22,7 +22,7 @@ open Util
 (* Translated from HOL4 in examples/machine-code/instruction-set-models/x86_64 *)
 
 (* 64-bit registers *)
-type reg = 
+type reg =
   | RAX | RBX | RCX  | RDX  | RSP  | RBP  | RSI  | RDI
   | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
 
@@ -31,8 +31,8 @@ let show_reg r =
   | RAX -> "rax"
   | RBX -> "rbx"
   | RCX -> "rcx"
-  | RDX -> "rdx" 
-  | RSP -> "rsp" 
+  | RDX -> "rdx"
+  | RSP -> "rsp"
   | RBP -> "rbp"
   | RSI -> "rsi"
   | RDI -> "rdi"
@@ -55,8 +55,8 @@ let show_byte_reg (B r) =
   | RAX -> "al"
   | RBX -> "bl"
   | RCX -> "cl"
-  | RDX -> "dl" 
-  | RSP -> "spl" 
+  | RDX -> "dl"
+  | RSP -> "spl"
   | RBP -> "bpl"
   | RSI -> "sil"
   | RDI -> "dil"
@@ -72,7 +72,7 @@ let show_byte_reg (B r) =
 let pp_byte_reg fmt r =
   fprintf fmt "%s" (show_byte_reg r)
 
-type rm = 
+type rm =
   | Zr of reg                                          (* register *)
   | Zm of (int * reg) option * reg option * int64 option (* mem[2^{scale} * index + base + displacement] *)
 
@@ -87,13 +87,13 @@ let rec simple_add_exp fmt l =
 let pp_rm fmt rm =
   match rm with
   | Zr r -> fprintf fmt "%a" pp_reg r
-  | Zm (idx,base,disp) -> 
+  | Zm (idx,base,disp) ->
     fprintf fmt "qword [%a]"
-      simple_add_exp [option_map (fun (scale,i) -> show_reg i ^ " * " ^ string_of_int scale) idx; 
-                      option_map show_reg base; 
+      simple_add_exp [option_map (fun (scale,i) -> show_reg i ^ " * " ^ string_of_int scale) idx;
+                      option_map show_reg base;
                       option_map Int64.to_string disp]
 
-type dest_src = 
+type dest_src =
   | Zrm_i of rm  * int64  (* mnemonic r/mXX, immXX (sign-extended) *)
   | Zrm_r of rm  * reg    (* mnemonic r/mXX, rXX *)
   | Zr_rm of reg * rm     (* mnemonic rXX, r/mXX *)
@@ -113,11 +113,11 @@ let pp_dest_src fmt ds =
       pp_reg reg
       pp_rm rm
 
-type imm_rm = 
+type imm_rm =
   | Zi_rm of rm      (* r/mXX *)
-  | Zi    of int64   (* sign-extended immediate *) 
+  | Zi    of int64   (* sign-extended immediate *)
 
-let pp_imm_rm fmt ir = 
+let pp_imm_rm fmt ir =
   match ir with
   | Zi_rm rm -> pp_rm fmt rm
   | Zi i -> fprintf fmt "%Ld" i
@@ -180,7 +180,7 @@ let pp_cond fmt c =
      | Z_G -> "g"
      | Z_NG -> "ng")
 
-type instruction = 
+type instruction =
   | Zlabel     of string
   | Zbinop     of binop_name * dest_src
   | Zmonop     of monop_name * rm
@@ -203,10 +203,10 @@ type instruction =
   | Zjmp       of rm                (* jmp excludes relative jumps, see jcc. *)
   | Zset       of cond * byte_reg   (* Set operates on a byte of memory or
                                        register. Here, we'll only use registers
-                                    *) 
+                                    *)
   (* | Zloop      of cond * int64    (* Here Zcond over approximates possibilities. *) *)
 
-let pp_instruction fmt i = 
+let pp_instruction fmt i =
   match i with
   | Zlabel s ->
     fprintf fmt "%s:" s

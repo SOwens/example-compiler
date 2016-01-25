@@ -21,6 +21,8 @@ open X86
 module L = LineariseCfg
 module T = Tokens
 
+exception Todo
+
 let tok_to_binop t =
   match t with
   | T.Plus -> Zadd
@@ -186,7 +188,7 @@ let rec be_to_x86 (underscore_labels : bool) be =
           (* Can't do a memory-to-memory move *)
           [Zmov (Zr_rm (r_scratch, m2));
            Zmov (Zrm_r (m1, r_scratch))]))
-  | Ld _ | St _ -> assert false (* TODO *)
+  | Ld _ | St _ -> raise Todo
   | In v ->
     caller_save @
     [Zcall ((if underscore_labels then "_" else "") ^ "input")] @

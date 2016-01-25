@@ -22,6 +22,8 @@
 open Util
 module S = SourceAst
 
+exception Todo
+
 type var =
   | Vreg of int
   | Stack of int
@@ -143,38 +145,6 @@ type cfg = cfg_entry list
   [@@deriving show]
 
 
-(* Convert an expression to an atomic expression, along with a list of basic
-   block entries that perform the computation of the expression. Essentially,
-   this flattens out the expression by using a temporary to store the results
-   of each sub-expression *)
-let exp_to_atomic (e : S.exp) : atomic_exp * basic_block =
-  (* Generate unique names for temporary variables *)
-  let next_ident = ref 1 in
-  let get_ident () : var =
-    let x = !next_ident in
-    next_ident := (!next_ident) + 1;
-    NamedTmp x
-  in
-  let rec do_to_atom (e : S.exp) : atomic_exp * basic_block =
-    match e with
-    | S.Ident (i, []) -> (Ident (NamedSource i), [])
-    | S.Num i -> (Num i, [])
-    | S.Bool _ -> raise (InternalError "Bool in blockStructure")
-    | S.Oper (e1, op, e2) ->
-      let (a1, s1) = do_to_atom e1 in
-      let (a2, s2) = do_to_atom e2 in
-      let ident = get_ident () in
-      (Ident ident, AssignOp (ident, a1, op, a2) :: s2 @ s1)
-  in
-  do_to_atom e
-
-(* Like exp_to_atomic, but strip the Identifier off of the expression,
-   but fail if the atomic is a num or bool, which can only happen if the
-   source exp is a num or bool. *)
-let exp_to_atomic_test (e : S.exp) : var * basic_block =
-  match exp_to_atomic e with
-  | (Ident i, stmts) -> (i, stmts)
-  | (Num _, _) -> raise (InternalError "exp_to_atomic")
 
 (* Build the control-flow graph *)
 let build_cfg (stmts : S.stmt list) : cfg =
@@ -193,6 +163,44 @@ let build_cfg (stmts : S.stmt list) : cfg =
                  started = false; finished = false} :: !the_cfg
   in
 
+  (* Generate unique names for temporary variables *)
+  let next_ident = ref 1 in
+  let get_ident () : var =
+    let x = !next_ident in
+    next_ident := (!next_ident) + 1;
+    NamedTmp x
+  in
+
+  (* Convert an expression to an atomic expression, along with a list of basic
+     block entries that perform the computation of the expression. Essentially,
+     this flattens out the expression by using a temporary to store the results
+     of each sub-expression *)
+  let rec exp_to_atomic (e : S.exp) : atomic_exp * basic_block =
+    match e with
+    | S.Ident (i, []) -> (Ident (NamedSource i), [])
+    | S.Ident (i, es) -> raise Todo
+    | S.Num i -> (Num i, [])
+    | S.Bool _ -> raise (InternalError "Bool in blockStructure")
+    | S.Oper (e1, op, e2) ->
+      let (a1, s1) = exp_to_atomic e1 in
+      let (a2, s2) = exp_to_atomic e2 in
+      let ident = get_ident () in
+      (Ident ident, AssignOp (ident, a1, op, a2) :: s2 @ s1)
+    | S.Array [] ->
+      raise (InternalError "0-dim array in blockStructure")
+    | S.Array es ->
+      raise Todo
+  in
+
+  (* Like exp_to_atomic, but strip the Identifier off of the expression,
+     but fail if the atomic is a num or bool, which can only happen if the
+     source exp is a num or bool. *)
+  let exp_to_atomic_test (e : S.exp) : var * basic_block =
+    match exp_to_atomic e with
+    | (Ident i, stmts) -> (i, stmts)
+    | (Num _, _) -> raise (InternalError "exp_to_atomic")
+  in
+
   (* Convert stmts to basic blocks, and add them to the_cfg. block_num is the
      index for the first block, ret_block for the block to return to after
      stmts. block_acc accumulates the block that we've seen so far. *)
@@ -208,6 +216,8 @@ let build_cfg (stmts : S.stmt list) : cfg =
       let (a, s2) = exp_to_atomic e in
       find_blocks block_num ret_block s1
         (AssignAtom (NamedSource x, a) :: s2 @ block_acc)
+    | S.Assign (x, es, e) :: s1 ->
+      raise Todo
     | S.Stmts s1 :: s2 ->
       find_blocks block_num ret_block (s1 @ s2) block_acc
     | S.While (e, s1) :: s2 ->
@@ -238,6 +248,8 @@ let build_cfg (stmts : S.stmt list) : cfg =
         find_blocks true_block_n following_block_n [s1] [];
         find_blocks false_block_n following_block_n [s2] [];
         find_blocks following_block_n ret_block s3 []
+    | ((S.Loc _) :: _) ->
+      raise (InternalError "Loc in blockStructure")
   in
 
   let end_block_num = get_block_num () in
