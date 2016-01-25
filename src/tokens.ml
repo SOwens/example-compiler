@@ -69,6 +69,7 @@ type token =
   | Lbrac
   | Rbrac
   | While
+  | Do
   | If
   | Then
   | Else
@@ -84,7 +85,7 @@ type tok_loc = (token * int)
   [@@ deriving show]
 
 let keywords =
-  [("while",While); ("if",If); ("then",Then); ("else",Else); ("array",Array); (":=",Assign);
+  [("do", Do); ("while",While); ("if",If); ("then",Then); ("else",Else); ("array",Array); (":=",Assign);
    ("true",True); ("input", Input); ("output",Output); ("false",False);
    ("+", Op Plus); ("-", Op Minus); ("*", Op Times); ("/", Op Div);
    ("<", Op Lt); (">", Op Gt);  ("=", Op Eq); ("&&", Op And); ("||", Op Or);

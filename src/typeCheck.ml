@@ -125,9 +125,14 @@ let rec type_stmts (ln : int option) (env :env_t) (stmts : stmt list) : unit =
       type_stmts ln env stmts'
     else
       type_error ln "Array assignment type mismatch"
-  | While (e, s) :: stmts ->
+  | DoWhile (s1, e, s2) :: stmts ->
+    (match s1 with
+     | None -> ()
+     | Some s -> type_stmts ln env [s]);
     if type_exp ln env e = Tbool then
-      (type_stmts ln env [s];
+      ((match s2 with
+          | None -> ()
+          | Some s -> type_stmts ln env [s]);
        type_stmts ln env stmts)
     else
       type_error ln "While test of non-bool type"
@@ -149,8 +154,8 @@ let rec remove_loc (stmts : stmt list) : stmt list =
 
 and remove_loc_one s =
   match s with
-  | While (e, s) ->
-    While (e, remove_loc_one s)
+  | DoWhile (s1, e, s) ->
+    DoWhile (option_map remove_loc_one s1, e, option_map remove_loc_one s)
   | Ite (e, s1, s2) ->
     Ite (e, remove_loc_one s1, remove_loc_one s2)
   | Stmts s ->

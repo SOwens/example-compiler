@@ -35,7 +35,7 @@ to link the program with the runtime library.
 The source language
 -------------------
 
-Keywords are `+ - * / | & << < > = || && := while if then else input output true false array`
+Keywords are `+ - * / | & << < > = || && := do while if then else input output true false array`
 
 Identifiers are strings of letters and digits (starting with a letter) that
 are not keywords.
@@ -82,6 +82,7 @@ exp ::=
 stmt ::=  
 | identifier indices `:=` exp  
 | `while` exp stmt  
+| `do` stmt `while` exp  
 | `if` exp `then` stmt `else` stmt  
 | `{` stmts `}`  
 | `input` identifier  

@@ -46,6 +46,7 @@ type token =
   | Lbrac
   | Rbrac
   | While
+  | Do
   | If
   | Then
   | Else
