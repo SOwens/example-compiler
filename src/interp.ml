@@ -16,11 +16,12 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* An interpreter. There is code at the bottom of the file that calls the interpreter, making this
-   suitable for compilation into an executable. *)
+(* An interpreter. There is code at the bottom of the file that calls the
+   interpreter, making this suitable for compilation into an executable. *)
 
 open Util
 open SourceAst
+module T = Tokens
 
 (* For when the interpreter crashed, such as array bounds violations *)
 exception Crash of string
@@ -46,9 +47,8 @@ let val_t_to_array (v : val_t) : int list * int64 array =
   | Varray (dims, a) -> (dims, a)
 
 (* Given the array's dimensions, work out the slot for a particular set of
-   indices. sizes and indices must have the same length.  Return None if one of
-   the indices is out of bounds, i.e. greater than the size.
-*)
+   indices. sizes and indices must have the same length.  Return None if one
+   of the indices is out of bounds, i.e. greater than the size. *)
 let array_address (sizes : int list) (indices : int list) : int option =
   (* acc keeps track of the product of the dimensions seen so far *)
   let rec f sizes indices (acc : int) =
@@ -65,7 +65,7 @@ let array_address (sizes : int list) (indices : int list) : int option =
     None
 
 (* The store will map variable names to values *)
-type store_t = val_t Strmap.t
+type store_t = val_t Idmap.t
 
 let bool_to_int64 (b : bool) : int64 =
   if b then 1L else 0L
@@ -79,26 +79,33 @@ let do_op op (n1 : int64) (n2 : int64) : int64 =
   | T.Plus -> Int64.add n1 n2
   | T.Minus -> Int64.sub n1 n2
   | T.Times -> Int64.mul n1 n2
-  | T.Div -> Int64.div n1 n2
+  | T.Div ->
+    if n2 = 0L then
+      raise (Crash "Division by 0")
+    else
+      Int64.div n1 n2
   | T.Lt -> bool_to_int64 (Int64.compare n1 n2 < 0)
   | T.Gt -> bool_to_int64 (Int64.compare n1 n2 > 0)
   | T.Eq -> bool_to_int64 (Int64.compare n1 n2 = 0)
-  | T.And -> bool_to_int64 (int64_to_bool n1 && int64_to_bool n2)
-  | T.Or -> bool_to_int64 (int64_to_bool n1 || int64_to_bool n2)
   | T.Lshift -> Int64.shift_left n1 (Int64.to_int n2)
   | T.BitOr -> Int64.logor n1 n2
   | T.BitAnd -> Int64.logand n1 n2
+  | T.And | T.Or -> assert false
+
+let do_uop uop (n : int64) : int64 =
+  bool_to_int64 (not (int64_to_bool n))
 
 (* Compute the value of an expression *)
 let rec interp_exp (store : store_t) (e : exp) : val_t =
   match e with
   | Ident (i, []) ->
-    Strmap.find i store (* i will be in the store in a well-typed program *)
+    Idmap.find i store (* i will be in the store in a well-typed program *)
   | Ident (i, iexps) ->
-    (match Strmap.find i store with
+    (match Idmap.find i store with
      | Varray (sizes, a) ->
        (let indices =
-          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
+          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
+            iexps
         in
         match array_address sizes indices with
         | None ->
@@ -109,26 +116,48 @@ let rec interp_exp (store : store_t) (e : exp) : val_t =
        raise TypeError)
   | Num n -> Vint n
   | Bool b -> Vint (bool_to_int64 b)
-  | Oper (e1, op, e2) ->
+  | Op (e1, T.And, e2) ->
+    (match interp_exp store e1 with
+     | Vint n ->
+       if int64_to_bool n then
+         interp_exp store e2
+       else
+         Vint n
+     | _ -> raise TypeError)
+   | Op (e1, T.Or, e2) ->
+    (match interp_exp store e1 with
+     | Vint n ->
+       if int64_to_bool n then
+         Vint n
+       else
+         interp_exp store e2
+     | _ -> raise TypeError)
+  | Op (e1, op, e2) ->
     (match (interp_exp store e1, interp_exp store e2) with
      | (Vint n1, Vint n2) ->
        Vint (do_op op n1 n2)
      | _ ->
-       raise (Crash "operator given non-integer value"))
+       raise TypeError)
+  | Uop (uop, e) ->
+    (match interp_exp store e with
+     | Vint n -> Vint (do_uop uop n)
+     | _ -> raise TypeError)
   | Array iexps ->
     let indices =
-      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
+      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
+        iexps
     in
-    Varray (indices, Array.make (List.fold_right (fun x y -> x * y) indices 1) 0L)
+    Varray (indices,
+            Array.make (List.fold_right (fun x y -> x * y) indices 1) 0L)
 
 (* Run a statement *)
 let rec interp_stmt (store : store_t) (s : stmt) : store_t =
   match s with
   | Assign (i, [], e) ->
     let v = interp_exp store e in
-    Strmap.add i v store
+    Idmap.add i v store
   | Assign (i, iexps, e) ->
-    (match Strmap.find i store with
+    (match Idmap.find i store with
      | Varray (sizes, a) ->
        (let indices =
           List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
@@ -160,11 +189,11 @@ let rec interp_stmt (store : store_t) (s : stmt) : store_t =
     Printf.printf "> ";
     (try
        let n = Int64.of_string (read_line ()) in
-       Strmap.add i (Vint n) store
-     with Failure _ -> raise (BadInput "not a 64-bit integer"))
+       Idmap.add i (Vint n) store
+     with Failure _ -> raise (Crash "not a 64-bit integer"))
   | Out i ->
     begin
-      print_string (Int64.to_string (val_t_to_int (Strmap.find i store)));
+      print_string (Int64.to_string (val_t_to_int (Idmap.find i store)));
       print_newline ();
       store
     end
@@ -201,4 +230,4 @@ let _ =
     (print_string usage_msg;
      exit 1)
   | Some filename ->
-    interp_stmts Strmap.empty (FrontEnd.front_end filename false)
+    interp_stmts Idmap.empty (FrontEnd.front_end filename false)

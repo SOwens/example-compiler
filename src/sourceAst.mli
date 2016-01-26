@@ -18,15 +18,19 @@
 
 (* The langauage's tokens, and a simple lexer *)
 
-module T = Tokens
-type id = string [@@deriving show]
+type id =
+  | Source of string
+  | Temp of int
+  [@@deriving show, ord]
+
+module Idmap : Map.S with type key = id
 
 type exp =
   | Ident of id * exp list
   | Num of int64
   | Bool of bool
-  | Op of exp * T.op * exp
-  | Uop of T.uop * exp
+  | Op of exp * Tokens.op * exp
+  | Uop of Tokens.uop * exp
   (* Allocate a new array of given dimensions. Initialise to 0 *)
   | Array of exp list
   [@@deriving show]
@@ -34,7 +38,7 @@ type exp =
 type stmt =
   | Assign of id * exp list * exp
   (* A generalised do/while loop. Always execute the first statement, then
-     the test, then repeatedly do the 2nd, then first statement and then test 
+     the test, then repeatedly do the 2nd, then first statement and then test
      'while e s' becomes DoWhile (Stmts [], e, s) and 'do s while e' becomes
      DoWhile (s, e, Stmts []) *)
   | DoWhile of stmt * exp * stmt

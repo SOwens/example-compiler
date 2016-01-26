@@ -23,7 +23,7 @@ open SourceAst
 
 let log2 (i : int64) : int option =
   (* Linear search for the least significant 1 in the binary represenatation.
-     A binary search would be faster, but maybe not worth the hassle? *)
+     A binary search might be faster, but maybe not worth the hassle? *)
   let rec f (i : int64) (shifted : int) : int option =
     if Int64.logand i 0x1L = 0L then
       f (Int64.shift_right i 1) (shifted + 1)
@@ -37,66 +37,131 @@ let log2 (i : int64) : int option =
   else
     None
 
+(* Decides whether evaluating an expression might have a side-effect *)
+let rec might_have_effect (e : exp) : bool =
+  match e with
+  | Ident (i, []) -> false
+  | Ident (i, es) -> true (* Array bound check failure *)
+  | Num _ | Bool _ -> false
+  | Op (e1, op, e2) ->
+    if op = T.Div then
+      true (* Divide by zero error *)
+    else
+      might_have_effect e1 || might_have_effect e2
+  | Uop (_, e) -> might_have_effect e
+  | Array es -> List.exists might_have_effect es
+
+(* Check whether two expressions are equal, and don't have effects. This lets
+   some operators remove them. Note that we are just comparing the structure of
+   the expressions, so we won't see that x + (y + z) is equal to (x + y) + z *)
+let ok_remove_eq_exp (e1 : exp) (e2 : exp) : bool =
+  e1 = e2 &&
+  not (might_have_effect e1) &&
+  not (might_have_effect e2)
+
+let between_0_63 (i : int64) =
+  Int64.compare i (-1L) = 1 && Int64.compare i 64L = -1
+
 (* Statically evaluate an expression according to the identifier values in env,
    don't try to follow constants in arrays.
    We don't do anything with associativity or commutativity, so things like
-   (x + 1) + 2 don't get changed. It would be nice to add that. *)
-let rec fold_exp (env : exp Strmap.t) (exp : exp) : exp =
-  match exp with
+   (x + 1) + 2 don't get changed. *)
+let rec fold_exp (env : exp Strmap.t) (e : exp) : exp =
+  match e with
   | Ident (i, []) ->
     (try Strmap.find i env
-     with Not_found -> exp)
-  | Ident (i, es) ->
-    Ident (i, List.map (fold_exp env) es)
+     with Not_found -> e)
+  | Ident (i, es) -> Ident (i, List.map (fold_exp env) es)
   | Num n -> Num n
   | Bool b -> Bool b
-  | Oper (e1, op, e2) ->
+  | Op (e1, op, e2) ->
     let o1 = fold_exp env e1 in
     let o2 = fold_exp env e2 in
     (match (o1, op, o2) with
+     (* Plus *)
      | (Num n1, T.Plus, Num n2) -> Num (Int64.add n1 n2)
      | (Num 0L, T.Plus, e) | (e, T.Plus, Num 0L) -> e
 
+     (* Minus *)
      | (Num n1, T.Minus, Num n2) -> Num (Int64.sub n1 n2)
      | (e, T.Minus, Num 0L) -> e
-     | (Ident (i1, []), T.Minus, Ident (i2, [])) when i1 = i2 ->
-         Num 0L
+     | (e1, T.Minus, e2) when ok_remove_eq_exp e1 e2 -> Num 0L
 
+     (* Times *)
      | (Num n1, T.Times, Num n2) -> Num (Int64.mul n1 n2)
      | (e, T.Times, Num 1L) | (Num 1L, T.Times, e) -> e
-     | (Num -1L, T.Times, e) | (e, T.Times, Num -1L) -> Oper (Num 0L, T.Minus, e)
-     | (e, T.Times, Num 0L) | (Num 0L, T.Times, e) -> Num 0L
+     | (Num -1L, T.Times, e) | (e, T.Times, Num -1L) ->
+        Op (Num 0L, T.Minus, e)
+     | (Num 0L, T.Times, e) | (e, T.Times, Num 0L)
+       when not (might_have_effect e) ->
+         Num 0L
      | (e, T.Times, Num n) | (Num n, T.Times, e) ->
-       (match log2 n with
-       | None -> exp
-       | Some log ->
-         Oper (e, T.Lshift, Num (Int64.of_int log)))
+       (match log2 (Int64.abs n) with
+        | None -> Op (o1, op, o2)
+        | Some log ->
+          let shift_op = Op (e, T.Lshift, Num (Int64.of_int log)) in
+          if n < 0L then
+            Op (Num 0L, T.Minus, shift_op)
+          else
+            shift_op)
 
+     (* Div *)
      | (Num n1, T.Div, Num n2) when n2 <> 0L -> Num (Int64.div n1 n2)
      | (e, T.Div, Num 1L) -> e
 
+     (* Less *)
      | (Num n1, T.Lt, Num n2) -> Bool (Int64.compare n1 n2 < 0)
-     | (Ident (i1, []), T.Lt, Ident (i2, [])) when i1 = i2 -> Bool false
+     | (e1, T.Lt, e2) when ok_remove_eq_exp e1 e2 -> Bool false
 
+     (* Greater *)
      | (Num n1, T.Gt, Num n2) -> Bool (Int64.compare n1 n2 > 0)
-     | (Ident (i1, []), T.Gt, Ident (i2, [])) when i1 = i2 -> Bool false
+     | (e1, T.Gt, e2) when ok_remove_eq_exp e1 e2 -> Bool false
 
+     (* Equal *)
      | (Num n1, T.Eq, Num n2) -> Bool (Int64.compare n1 n2 = 0)
-     | (Ident (i1, []), T.Eq, Ident (i2, [])) when i1 = i2 -> Bool true
+     | (e1, T.Eq, e2) when ok_remove_eq_exp e1 e2 -> Bool true
 
-     | (Num n1, T.Lshift, Num n2) -> Num (Int64.shift_left n1 (Int64.to_int n2))
+     (* Shift left *)
+     | (Num n1, T.Lshift, Num n2) when between_0_63 n2 ->
+       (* Ocaml's shift_left is only defined between 0 and 63 inclusive *)
+       Num (Int64.shift_left n1 (Int64.to_int n2))
      | (e, T.Lshift, Num 0L) -> e
-     | (Num 0L, T.Lshift, e) -> Num 0L
+     | (Num 0L, T.Lshift, e) when not (might_have_effect e) ->
+       Num 0L
 
+     (* Bitwise or *)
      | (Num n1, T.BitOr, Num n2) -> Num (Int64.logor n1 n2)
      | (Num 0L, T.BitOr, e) | (e, T.BitOr, Num 0L) -> e
-     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitOr, e) | (e, T.BitOr, Num 0xFFFFFFFFFFFFFFFFL) -> Num 0xFFFFFFFFFFFFFFFFL
+     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitOr, e)
+     | (e, T.BitOr, Num 0xFFFFFFFFFFFFFFFFL) when not (might_have_effect e) ->
+       Num 0xFFFFFFFFFFFFFFFFL
 
+     (* Bitwise and *)
      | (Num n1, T.BitAnd, Num n2) -> Num (Int64.logand n1 n2)
-     | (Num 0L, T.BitAnd, e) | (e, T.BitAnd, Num 0L) -> Num 0L
-     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitAnd, e) | (e, T.BitAnd, Num 0xFFFFFFFFFFFFFFFFL) -> e
+     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitAnd, e)
+     | (e, T.BitAnd, Num 0xFFFFFFFFFFFFFFFFL) -> e
+     | (Num 0L, T.BitAnd, e)
+     | (e, T.BitAnd, Num 0L) when not (might_have_effect e) -> Num 0L
 
-     | _ -> Oper (o1, op, o2))
+     (* And *)
+     | (Bool true, T.And, e) | (e, T.And, Bool true) -> e
+     | (Bool false, T.And, e) -> Bool false
+     | (e, T.And, Bool false) when not (might_have_effect e) -> Bool false
+     | (e1, T.And, e2) when ok_remove_eq_exp e1 e2 -> e1
+
+     (* Or *)
+     | (Bool false, T.Or, e) | (e, T.Or, Bool false) -> e
+     | (Bool true, T.Or, e) -> Bool true
+     | (e, T.Or, Bool true) when not (might_have_effect e) -> Bool true
+     | (e1, T.Or, e2) when ok_remove_eq_exp e1 e2 -> e1
+
+     | _ -> Op (o1, op, o2))
+  | Uop (uop, e) ->
+    let o = fold_exp env e in
+    (match (uop, o) with
+     | (T.Not, Bool b) -> Bool (not b)
+     | (T.Not, Uop (T.Not, e)) -> e
+     | _ -> Uop (uop, o))
   | Array es ->
     Array (List.map (fold_exp env) es)
 
@@ -112,7 +177,8 @@ let same_const (e1 : exp) (e2 : exp) : bool =
   | _ -> false
 
 (* If v1 and v2 contain the same constant, return it. Otherwise return None *)
-let merge_constants (id : id) (v1 : exp option) (v2 : exp option) : exp option =
+let merge_constants (id : id) (v1 : exp option) (v2 : exp option) 
+  : exp option =
   match (v1,v2) with
   | (Some e1, Some e2) ->
     if same_const e1 e2 then
@@ -123,15 +189,10 @@ let merge_constants (id : id) (v1 : exp option) (v2 : exp option) : exp option =
 (* Do constant propagation. Accumulate an environment of definitely known
    constants at the end of stmts, given definitely known constants env at the
    start. *)
-let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stmt list =
+let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list)
+  : exp Strmap.t * stmt list =
   match stmts with
   | [] -> (env,[])
-  | In x :: stmts ->
-    let (env',stmts') = prop_stmts (Strmap.remove x env) stmts in
-    (env', In x :: stmts')
-  | Out x :: stmts ->
-    let (env',stmts') = prop_stmts env stmts in
-    (env', Out x :: stmts')
   | Assign (x, [], e) :: stmts ->
     let o1 = fold_exp env e in
     let first_env =
@@ -145,17 +206,25 @@ let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stm
     let (env', stmts') = prop_stmts env stmts in
     (env', Assign (x, os, o) :: stmts')
   | DoWhile (s0, e, s1) :: stmts ->
-    let (env', t1) = prop_stmts env [s1] in
-    let o1 = fold_exp env' e in
-    (match o1 with
-     | Bool false -> prop_stmts env stmts
+    (* s0 is always executed *)
+    let (env_init, t) = prop_stmt env s0 in
+    let o = fold_exp env_init e in
+    (match o with
+     | Bool false ->
+       let (env', stmts') = prop_stmts env_init stmts in
+       (env', t::stmts')
      | _ ->
-       let (env1,os1) = prop_loop_body env [s1; s0] in
-       (* have to redo the condition, for the sound constants on entry *)
-       let (env1', t1) = prop_stmts env1 [s1] in
-       let o1 = fold_exp env1' e in
-       let (env1'',stmts') = prop_stmts env1' stmts in
-       (env1'', DoWhile (o1, os1) :: stmts'))
+       (* From this point, the loop might execute s1;s0 0 or more times, so we
+          calculate env1 which contains the constants that are constant no
+          matter how many times the loop is executed *)
+       let env1 = prop_loop_body env_init [s1; s0] in
+       (* Now re-calculate the constant propagation for the things constant no
+          matter how many times we iterate the loop *)
+       let (_, t0) = prop_stmt env1 s0 in
+       let o = fold_exp env1 e in
+       let (_, t1) = prop_stmt env1 s1 in
+       let (env',stmts') = prop_stmts env1 stmts in
+       (env1, DoWhile (t0, o, t1) :: stmts'))
   | Ite (e, s1, s2) :: stmts ->
     let o1 = fold_exp env e in
     (match o1 with
@@ -172,30 +241,39 @@ let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t * stm
        let (env2, os2) = prop_stmt env s2 in
        (* Only include constants that are known to be the same at the end of
           both branches of the Ite for the subsequent statements. *)
-       let (env',stmts') = prop_stmts (Strmap.merge merge_constants env1 env2) stmts in
+       let (env',stmts') =
+         prop_stmts (Strmap.merge merge_constants env1 env2) stmts
+       in
        (env', Ite (o1, os1, os2) :: stmts'))
   | Stmts (stmts1) :: stmts ->
     let (env1, os1) = prop_stmts env stmts1 in
     let (env', stmts') = prop_stmts env1 stmts in
     (env', Stmts (os1) :: stmts')
-  | Loc _ :: _ -> raise (InternalError "Loc in constProp")
+  | In x :: stmts ->
+    let (env',stmts') = prop_stmts (Strmap.remove x env) stmts in
+    (env', In x :: stmts')
+  | Out x :: stmts ->
+    let (env',stmts') = prop_stmts env stmts in
+    (env', Out x :: stmts')
+  | Loc (s, ln) :: stmts ->
+    let (env1, o1) = prop_stmt env s in
+    let (env', stmts') = prop_stmts env1 stmts in
+    (env', Loc (o1, ln) :: stmts')
 
-and prop_stmt env stmt =
+and prop_stmt env (stmt : stmt) =
   match prop_stmts env [stmt] with
   | (env,[os]) -> (env,os)
-  | _ -> raise (InternalError "prop_stmt")
+  | _ -> assert false
 
 (* Given possibly known constants env at the start, compute the definitely
-   known constants at the end, assuming that stmt is run in a loop body an
+   known constants at the end, assuming that stmts is run in a loop body an
    unknown number of times. *)
-and prop_loop_body (env : exp Strmap.t) stmt : exp Strmap.t * stmt =
-  let (env', stmt') = prop_stmt env stmt in
+and prop_loop_body (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t =
+  let (env', stmts') = prop_stmts env stmts in
   (* The next approximation of constants at the start *)
   let env'' = Strmap.merge merge_constants env env' in
   if Strmap.equal same_const env env'' then
     (* Same as last time, fixed point reached *)
-    (env',stmt')
+    env''
   else
-    (* Use the original statement body, because stmt' was computed with too
-       many constants *)
-    prop_loop_body env'' stmt
+    prop_loop_body env'' stmts

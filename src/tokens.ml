@@ -20,13 +20,6 @@
 
 open Util
 
-(* Regular expressions that describe various syntactic entities *)
-let number_re = Str.regexp "[0-9]+"
-let ident_re = Str.regexp "[a-zA-Z][a-zA-Z0-9]*\\|[-+*/<>=]\\|:=\\|&&\\|||"
-let space_re = Str.regexp "[ \t]+"
-let newline_re = Str.regexp "\n"
-let bracket_re = Str.regexp "[(){}]"
-
 (* Primitive operators *)
 type op =
   | Plus
@@ -94,8 +87,11 @@ type tok_loc = (token * int)
   [@@ deriving show]
 
 let keywords =
-  [("do", Do); ("while",While); ("if",If); ("then",Then); ("else",Else); ("array",Array); (":=",Assign);
-   ("true",True); ("input", Input); ("output",Output); ("false",False); (uop_to_string Not, Uop Not)] @
+  [("do", Do); ("while",While); ("if",If); ("then",Then); ("else",Else);
+   ("array",Array); (":=",Assign); ("true",True); ("input", Input);
+   ("output",Output); ("false",False); ("(",Lparen); (")",Rparen);
+   ("{",Lcurly); ("}",Rcurly); ("[",Lbrac); ("]",Rbrac);
+   (uop_to_string Not, Uop Not)] @
   List.map (fun o -> (op_to_string o, Op o))
     [Plus; Minus; Times; Div; Lt; Gt; Eq; And; Or; Lshift; BitOr; BitAnd]
 
@@ -103,14 +99,19 @@ let keywords =
 let keyword_map : token Strmap.t =
   List.fold_left (fun m (k,v) -> Strmap.add k v m) Strmap.empty keywords
 
-let brackets =
-  [("(", Lparen); (")", Rparen);
-   ("{", Lcurly); ("}", Rcurly);
-   ("[", Lbrac); ("]", Rbrac)]
+(* Regular expressions that describe various syntactic entities *)
+let keyword_re =
+  Str.regexp
+    (String.concat "\\|"
+       (List.map (fun (s, _) -> Str.quote s) keywords))
 
-(* Map each type of bracket to its corresponding token *)
-let brackets_map : token Strmap.t =
-  List.fold_left (fun m (k,v) -> Strmap.add k v m) Strmap.empty brackets
+let number_re = Str.regexp "[0-9]+"
+
+let ident_re = Str.regexp "[a-zA-Z][a-zA-Z0-9]*"
+
+let space_re = Str.regexp "[ \t]+\\(//.*\\)+"
+
+let newline_re = Str.regexp "\n"
 
 (* Read all the tokens from s, using pos to index into the string and line_n
    to track the current line number, but error reporting later on. Return them
@@ -122,13 +123,11 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
     lex s (Str.match_end ()) line_n
   else if Str.string_match newline_re s pos then
     lex s (Str.match_end ()) (line_n + 1)
-  else if Str.string_match ident_re s pos then
-    let ident = Str.matched_string s in
-    let tok =
-      try Strmap.find ident keyword_map
-      with Not_found -> Ident ident
-    in
+  else if Str.string_match keyword_re s pos then
+    let tok = Strmap.find (Str.matched_string s) keyword_map in
     (tok, line_n) :: lex s (Str.match_end ()) line_n
+  else if Str.string_match ident_re s pos then
+    (Ident (Str.matched_string s), line_n) :: lex s (Str.match_end ()) line_n
   else if Str.string_match number_re s pos then
     let num =
       try Int64.of_string (Str.matched_string s)
@@ -139,15 +138,8 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
                          string_of_int line_n))
     in
     (Num num, line_n) :: lex s (Str.match_end ()) line_n
-  else if Str.string_match bracket_re s pos then
-    let b = Str.matched_string s in
-    let tok =
-      try Strmap.find b brackets_map
-      with Not_found -> raise (InternalError "lex")
-    in
-    (tok, line_n) :: lex s (Str.match_end ()) line_n
   else
-    raise (BadInput ("Unknown character '" ^
+    raise (BadInput ("At character '" ^
                      String.sub s pos 1 ^
                      "' on line " ^
                      string_of_int line_n))

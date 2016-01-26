@@ -1,6 +1,6 @@
 PACKAGES = ppx_deriving.show,extlib,str,ppx_monadic,ppx_deriving.ord
 
-FILES = util tokens sourceAst typeCheck frontEnd removeBool constProp \
+FILES = util tokens sourceAst typeCheck frontEnd constProp unnestExp removeBool \
 blockStructure shrinkImmediates liveVarAnalysis regAlloc lineariseCfg x86 \
 instrSelX86 interp compile pretty
 

@@ -20,6 +20,7 @@
 
 open Util
 open SourceAst
+module T = Tokens
 
 (* Types *)
 type t =
@@ -33,9 +34,8 @@ let show_t t =
   | Tbool -> "bool"
   | Tarray n -> "array " ^ string_of_int n
 
-
 (* Map identifiers to their types *)
-type env_t = t Strmap.t
+type env_t = t Idmap.t
 
 (* Raise a type error *)
 let type_error (ln : int option) (msg : string) : 'a =
@@ -45,14 +45,15 @@ let type_error (ln : int option) (msg : string) : 'a =
   | None ->
     raise (BadInput ("Type error at unknown location: " ^ msg))
 
-(* Compute the type of an expression, or raise BadInput if there is a type error *)
+(* Compute the type of an expression, or raise BadInput if there is a type
+   error *)
 let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
   match e with
   | Ident (i, es) ->
     let t =
-      try Strmap.find i env
+      try Idmap.find i env
       with Not_found ->
-        type_error ln ("Uninitialised variable " ^ i)
+        type_error ln ("Uninitialised variable " ^ show_id i)
     in
     let ts = List.map (type_exp ln env) es in
     let l = List.length ts in
@@ -63,22 +64,25 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
        else if num_dims = l then
          type_error ln "Array index with non-integer type"
        else
-         type_error ln ("Array reference with " ^ string_of_int l ^ " indices, expected " ^
-                          string_of_int num_dims)
+         type_error ln ("Array reference with " ^ string_of_int l ^
+                        " indices, expected " ^ string_of_int num_dims)
      | t ->
        if l = 0 then
          t
        else
-         type_error ln ("Attempt to index non-array variable " ^ i))
+         type_error ln ("Attempt to index non-array variable " ^ show_id i))
   | Num n -> Tint
   | Bool b -> Tbool
   | Op (e1, op, e2) ->
     (match (type_exp ln env e1, op, type_exp ln env e2) with
      | (Tbool, (T.And | T.Or), Tbool) -> Tbool
-     | (Tint, (T.Plus | T.Minus | T.Times | T.Div | T.Lshift | T.BitOr | T.BitAnd), Tint) -> Tint
+     | (Tint, (T.Plus | T.Minus | T.Times | T.Div | T.Lshift | T.BitOr |
+               T.BitAnd), Tint) ->
+       Tint
      | (Tint, (T.Lt | T.Eq | T.Gt), Tint) -> Tbool
      | (t1, _, t2) ->
-       type_error ln ("Operator " ^ T.show_op op ^ " applied to " ^ show_t t1 ^ " and " ^ show_t t2))
+       type_error ln ("Operator " ^ T.show_op op ^ " applied to " ^ show_t t1 ^
+                      " and " ^ show_t t2))
   | Uop (uop, e) ->
     (match (uop, type_exp ln env e) with
      | (T.Not, Tbool) -> Tbool
@@ -99,12 +103,12 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
    extend the type environment *)
 let type_lhs_ident (env :env_t) (x : id) (t : t) (ln : int option) : env_t =
   try
-    if Strmap.find x env = t then
+    if Idmap.find x env = t then
       env
     else
-      type_error ln ("Bad type for " ^ x)
+      type_error ln ("Bad type for " ^ show_id x)
   with Not_found ->
-    Strmap.add x t env
+    Idmap.add x t env
 
 (* Type check a list of statements. Raise BadInput if there is an error.  Check
    a list so that earlier assignment statements can extend the environment for
@@ -116,7 +120,7 @@ let rec type_stmts (ln : int option) (env :env_t) (stmts : stmt list) : unit =
     let env' = type_lhs_ident env x Tint ln in
     type_stmts ln env' stmts'
   | Out x :: stmts' ->
-    if Strmap.find x env = Tint then
+    if Idmap.find x env = Tint then
       type_stmts ln env stmts'
     else
       type_error ln "Output with non-integer type"

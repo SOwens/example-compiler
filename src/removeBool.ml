@@ -22,14 +22,16 @@
 open SourceAst
 module T = Tokens
 
-(* Get rid of booleans, &&, and || on the right of an assignment. Rely on
-   the fact that they have to be at the top level of an expression (due to the
-   type system), so we don't have to worry about 1 + (a && b) etc. Necessary to
+(* Get rid of booleans, &&, and || on the right of an assignment. Rely on the
+   fact that they have to be at the top level of an expression (due to the type
+   system), so we don't have to worry about 1 + (a && b) etc. Necessary to
    support short-circuit evaluation.
 
    x := e1 && e2 --> x := e1; if x then x := e2 else {}
    x := e1 || e2 --> x := e1; if x then {} else x := e2
+   x := !!e -> e
 *)
+
 let rec remove_and_or_exp (id : id) (e : exp) : stmt list =
   match e with
   | Bool true -> [Assign (id, [], Num 1L)]
@@ -56,6 +58,7 @@ let is_and_or_exp (e : exp) : bool =
    if e then s1 else s2 --> __tmp := e; if __tmp then s1 else s2
 
 *)
+
 let rec remove_and_or_stmt (s : stmt) : stmt list =
   match s with
   | Assign (id, [], e) ->

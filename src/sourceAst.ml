@@ -22,7 +22,22 @@
 open Util
 module T = Tokens
 
-type id = string [@@deriving show]
+type id =
+  | Source of string
+  | Temp of int
+  [@@deriving show, ord]
+
+let show_id i =
+  match i with
+  | Source s -> s
+  | Temp s -> "_tmp" ^ string_of_int s
+
+module Idord = struct
+  type t = id
+  let compare = compare_id
+end
+
+module Idmap = Map.Make(Idord)
 
 (* AST of expressions *)
 type exp =
@@ -39,7 +54,7 @@ type exp =
 type stmt =
   | Assign of id * exp list * exp
   (* A generalised do/while loop. Always execute the first statement, then
-     the test, then repeatedly do the 2nd, then first statement and then test 
+     the test, then repeatedly do the 2nd, then first statement and then test
      'while e s' becomes DoWhile (Stmts [], e, s) and 'do s while e' becomes
      DoWhile (s, e, Stmts []) *)
   | DoWhile of stmt * exp * stmt
@@ -61,10 +76,13 @@ let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   | [] -> raise (BadInput "End of file while parsing an expression")
   | (T.Ident i, ln) :: toks ->
     let (indices, toks) = parse_indices toks in
-    (Ident (i, indices), toks)
+    (Ident (Source i, indices), toks)
   | (T.Num n, _) :: toks -> (Num n, toks)
   | (T.True, _) :: toks -> (Bool true, toks)
   | (T.False, _) :: toks -> (Bool false, toks)
+  | (T.Op T.Minus, _) :: toks ->
+    let (e, toks) = parse_atomic_exp toks in
+    (Op (Num 0L, T.Minus, e), toks)
   | (T.Uop uop, _) :: toks ->
     let (e, toks) = parse_atomic_exp toks in
     (Uop (uop, e), toks)
@@ -105,7 +123,7 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
   | (T.Ident x, ln) :: (T.Assign, _) :: toks ->
     let (e, toks) = parse_exp toks in
     let (indices, toks) = parse_indices toks in
-    (Loc (Assign (x, indices, e), ln), toks)
+    (Loc (Assign (Source x, indices, e), ln), toks)
   | (T.While, ln) :: toks ->
     let (e, toks) = parse_exp toks in
     let (s, toks) = parse_stmt toks in
@@ -128,8 +146,9 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
   | (T.Lcurly, ln) :: toks ->
     let (s_list, toks) = parse_stmt_list toks in
     (Loc (Stmts (s_list), ln), toks)
-  | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In x, ln), toks)
-  | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out x, ln), toks)
+  | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In (Source x), ln), toks)
+  | (T.Output, ln) :: (T.Ident x, _) :: toks ->
+    (Loc (Out (Source x), ln), toks)
   | (_,ln) :: _ ->
     parse_error ln "Bad statement"
 
