@@ -35,7 +35,7 @@ to link the program with the runtime library.
 The source language
 -------------------
 
-Keywords are `+ - * / | & << < > = || && := do while if then else input output true false array`
+Keywords are `+ - * / | & << < > = || && ! := do while if then else input output true false array`
 
 Identifiers are strings of letters and digits (starting with a letter) that
 are not keywords.
@@ -54,30 +54,34 @@ op ::=
 | `-`  --- Subtraction  
 | `*`  --- Multiplication  
 | `/`  --- Division  
-| `|`  --- Bitwise-or  
-| `&`  --- Bitwise-and  
+| `|`  --- Bitwise or  
+| `&`  --- Bitwise and  
 | `<<` --- Left shift  
 | `<`  --- Less than  
 | `>`  --- Greater than  
 | `=`  --- Equality  
-| `||` --- Logical Or  
-| `&&` --- Logical And
+| `||` --- Logical or  
+| `&&` --- Logical and~~
+
+uop ::=~~
+| `!`  --- Logical negation
 
 indices ::=  
-| epsilon  
-| `[` exp `]` indices
+| `[` exp `]` indices  
+| epsilon
 
 atomic_exp ::=  
 | identifier indices  
 | number  
 | `true`  
 | `false`  
-| `(` atomic_exp op atomic_exp `)`
-| `array` indices
+| uop atomic_exp  
+| `array` indices  
+| `(` exp `)`
 
 exp ::=  
+| atomic_exp op atomic_exp  
 | atomic_exp
-| atomic_exp op atmoic_exp
 
 stmt ::=  
 | identifier indices `:=` exp  

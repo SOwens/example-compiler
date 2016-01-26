@@ -27,6 +27,13 @@ type t =
   | Tbool
   | Tarray of int (* The number of dimensions that the array has *)
 
+let show_t t =
+  match t with
+  | Tint -> "int"
+  | Tbool -> "bool"
+  | Tarray n -> "array " ^ string_of_int n
+
+
 (* Map identifiers to their types *)
 type env_t = t Strmap.t
 
@@ -37,7 +44,6 @@ let type_error (ln : int option) (msg : string) : 'a =
     raise (BadInput ("Type error on line " ^ string_of_int ln ^ ": " ^ msg))
   | None ->
     raise (BadInput ("Type error at unknown location: " ^ msg))
-
 
 (* Compute the type of an expression, or raise BadInput if there is a type error *)
 let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
@@ -66,15 +72,18 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
          type_error ln ("Attempt to index non-array variable " ^ i))
   | Num n -> Tint
   | Bool b -> Tbool
-  | Oper (e1, op, e2) ->
-    let t1 = type_exp ln env e1 in
-    let t2 = type_exp ln env e2 in
-    (match (t1, op, t2) with
+  | Op (e1, op, e2) ->
+    (match (type_exp ln env e1, op, type_exp ln env e2) with
      | (Tbool, (T.And | T.Or), Tbool) -> Tbool
      | (Tint, (T.Plus | T.Minus | T.Times | T.Div | T.Lshift | T.BitOr | T.BitAnd), Tint) -> Tint
      | (Tint, (T.Lt | T.Eq | T.Gt), Tint) -> Tbool
-     | (_, op, _) ->
-       type_error ln ("Type error on operator " ^ T.show_op op))
+     | (t1, _, t2) ->
+       type_error ln ("Operator " ^ T.show_op op ^ " applied to " ^ show_t t1 ^ " and " ^ show_t t2))
+  | Uop (uop, e) ->
+    (match (uop, type_exp ln env e) with
+     | (T.Not, Tbool) -> Tbool
+     | (_, t) ->
+       type_error ln ("Operator " ^ T.show_uop uop ^ " applied to " ^ show_t t))
   | Array es ->
     let ts = List.map (type_exp ln env) es in
     let l = List.length ts in

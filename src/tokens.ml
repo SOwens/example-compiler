@@ -43,6 +43,10 @@ type op =
   | BitAnd
   [@@deriving show]
 
+type uop =
+  | Not
+  [@@deriving show]
+
 let op_to_string op =
   match op with
   | Plus -> "+"
@@ -58,10 +62,15 @@ let op_to_string op =
   | BitOr -> "|"
   | BitAnd -> "&"
 
+let uop_to_string uop =
+  match uop with
+  | Not -> "!"
+
 type token =
   | Num of int64
   | Ident of string
   | Op of op
+  | Uop of uop
   | Lparen
   | Rparen
   | Lcurly
@@ -86,10 +95,9 @@ type tok_loc = (token * int)
 
 let keywords =
   [("do", Do); ("while",While); ("if",If); ("then",Then); ("else",Else); ("array",Array); (":=",Assign);
-   ("true",True); ("input", Input); ("output",Output); ("false",False);
-   ("+", Op Plus); ("-", Op Minus); ("*", Op Times); ("/", Op Div);
-   ("<", Op Lt); (">", Op Gt);  ("=", Op Eq); ("&&", Op And); ("||", Op Or);
-   ("<<", Op Lshift); ("|", Op BitOr); ("&", Op BitAnd)]
+   ("true",True); ("input", Input); ("output",Output); ("false",False); (uop_to_string Not, Uop Not)] @
+  List.map (fun o -> (op_to_string o, Op o))
+    [Plus; Minus; Times; Div; Lt; Gt; Eq; And; Or; Lshift; BitOr; BitAnd]
 
 (* Map each keyword string to its corresponding token *)
 let keyword_map : token Strmap.t =

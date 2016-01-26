@@ -25,7 +25,8 @@ type exp =
   | Ident of id * exp list
   | Num of int64
   | Bool of bool
-  | Oper of exp * T.op * exp
+  | Op of exp * T.op * exp
+  | Uop of T.uop * exp
   (* Allocate a new array of given dimensions. Initialise to 0 *)
   | Array of exp list
   [@@deriving show]

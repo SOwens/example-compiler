@@ -16,7 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* The language's AST, and a recursive descent parser *)
+(* The language's AST, and a recursive descent parser. See the README for the
+   grammar. *)
 
 open Util
 module T = Tokens
@@ -28,7 +29,8 @@ type exp =
   | Ident of id * exp list
   | Num of int64
   | Bool of bool
-  | Oper of exp * T.op * exp
+  | Op of exp * T.op * exp
+  | Uop of T.uop * exp
   (* Allocate a new array of given dimensions. Initialise to 0 *)
   | Array of exp list
   [@@deriving show]
@@ -63,87 +65,83 @@ let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   | (T.Num n, _) :: toks -> (Num n, toks)
   | (T.True, _) :: toks -> (Bool true, toks)
   | (T.False, _) :: toks -> (Bool false, toks)
-  | (T.Lparen, ln) :: toks ->
-    (match parse_atomic_exp toks with
-     | (e, (T.Op o, ln') :: toks2) ->
-       (match parse_atomic_exp toks2 with
-        | (e', (T.Rparen, ln'') :: toks3) -> (Oper (e, o, e'), toks3)
-        | _ -> parse_error ln "'(' without matching ')'")
-     | _ -> parse_error ln "'(' without following operator")
-  | (T.Array, l) :: toks ->
+  | (T.Uop uop, _) :: toks ->
+    let (e, toks) = parse_atomic_exp toks in
+    (Uop (uop, e), toks)
+  | (T.Array, _) :: toks ->
     let (indices, toks) = parse_indices toks in
     (Array indices, toks)
+  | (T.Lparen, ln) :: toks ->
+    (match parse_exp toks with
+     | (e, (T.Rparen, _) :: toks) ->
+       (e, toks)
+     | _ -> parse_error ln "'(' without matching ')'")
   | (_, ln) :: _ ->
     parse_error ln "Bad expression"
 
 and parse_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
-  let (exp1, toks) = parse_atomic_exp toks in
-  match toks with
-  | (T.Op o, ln) :: toks ->
-    let (exp2, toks) = parse_atomic_exp toks in
-    (Oper (exp1, o, exp2), toks)
-  | _ ->
-    (exp1, toks)
+  match parse_atomic_exp toks with
+  | (e1, (T.Op o, ln) :: toks) ->
+    let (e2, toks) = parse_atomic_exp toks in
+    (Op (e1, o, e2), toks)
+  | (e1, toks) -> (e1, toks)
 
-(* Parse 0 or more array indices *)
+(* Parse 0 or more array indices. Return them with the left over tokens. *)
 and parse_indices (toks : T.tok_loc list) : exp list * T.tok_loc list =
   match toks with
   | (T.Lbrac, l) :: toks ->
-    let (exp, toks) = parse_exp toks in
-    (match toks with
-     | (T.Rbrac, _) :: toks ->
-       let (exps,toks) = parse_indices toks in
-       (exp::exps, toks)
+    (match parse_exp toks with
+     | (e, (T.Rbrac, _) :: toks) ->
+       let (es,toks) = parse_indices toks in
+       (e::es, toks)
      | _ -> parse_error l "'[' without matching ']'")
-  | _ ->
-    ([], toks)
+  | _ -> ([], toks)
 
 (* Convert the first statement in toks into an AST. Return it with the left
    over tokens *)
 let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
   match toks with
   | [] -> raise (BadInput "End of file while parsing a statement")
-  | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In x, ln), toks)
-  | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out x, ln), toks)
   | (T.Ident x, ln) :: (T.Assign, _) :: toks ->
     let (e, toks) = parse_exp toks in
     let (indices, toks) = parse_indices toks in
     (Loc (Assign (x, indices, e), ln), toks)
   | (T.While, ln) :: toks ->
-    let (e, toks1) = parse_exp toks in
-    let (s, toks2) = parse_stmt toks1 in
-    (Loc (DoWhile (Stmts [], e, s), ln), toks2)
+    let (e, toks) = parse_exp toks in
+    let (s, toks) = parse_stmt toks in
+    (Loc (DoWhile (Stmts [], e, s), ln), toks)
   | (T.Do, ln) :: toks ->
-    let (s, toks1) = parse_stmt toks in
-    (match toks1 with
-     | (T.While, _)::toks2 ->
-       let (e, toks3) = parse_exp toks2 in
-       (Loc (DoWhile (s, e, Stmts []), ln), toks3)
+    (match parse_stmt toks with
+     | (s, (T.While, _)::toks) ->
+       let (e, toks) = parse_exp toks in
+       (Loc (DoWhile (s, e, Stmts []), ln), toks)
      | _ -> parse_error ln "'do' without 'while'")
   | (T.If, ln) :: toks ->
     (match parse_exp toks with
-     | (e, (T.Then, _) :: toks1) ->
-       (match parse_stmt toks1 with
-        | (s1, (T.Else, _) :: toks2) ->
-          let (s2, toks3) = parse_stmt toks2 in
-          (Loc (Ite (e, s1, s2), ln), toks3)
+     | (e, (T.Then, _) :: toks) ->
+       (match parse_stmt toks with
+        | (s1, (T.Else, _) :: toks) ->
+          let (s2, toks) = parse_stmt toks in
+          (Loc (Ite (e, s1, s2), ln), toks)
         | _ -> parse_error ln "'if' without 'else'")
      | _ ->  parse_error ln "'if' without 'then")
   | (T.Lcurly, ln) :: toks ->
     let (s_list, toks) = parse_stmt_list toks in
     (Loc (Stmts (s_list), ln), toks)
+  | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In x, ln), toks)
+  | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out x, ln), toks)
   | (_,ln) :: _ ->
     parse_error ln "Bad statement"
 
-(* Convert all of the statement in toks into an AST. Return them with the left
-   over tokens *)
+(* Convert all of the statement in toks into an AST, stopping on a }. Return
+   them with the left over tokens *)
 and parse_stmt_list (toks : T.tok_loc list) : stmt list * T.tok_loc list =
   match toks with
-  | ((T.Rcurly, _) :: toks') -> ([], toks')
+  | ((T.Rcurly, _) :: toks) -> ([], toks)
   | _ ->
-    let (s, toks') = parse_stmt toks in
-    let (s_list, toks'') = parse_stmt_list toks' in
-    (s::s_list, toks'')
+    let (s, toks) = parse_stmt toks in
+    let (s_list, toks) = parse_stmt_list toks in
+    (s::s_list, toks)
 
 (* Repeatedly parse statments until the input is empty *)
 (* NB, the difference between parse_stmt_list which can leave leftover tokens *)
@@ -151,6 +149,6 @@ let rec parse_program (toks : T.tok_loc list) : stmt list =
   match toks with
   | [] -> []
   | _ ->
-    let (s, toks') = parse_stmt toks in
-    let s_list = parse_program toks' in
+    let (s, toks) = parse_stmt toks in
+    let s_list = parse_program toks in
     s::s_list

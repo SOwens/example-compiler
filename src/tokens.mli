@@ -33,12 +33,18 @@ type op =
   | BitAnd
   [@@deriving show]
 
+type uop =
+  | Not
+  [@@deriving show]
+
 val op_to_string : op -> string
+val uop_to_string : uop -> string
 
 type token =
   | Num of int64
   | Ident of string
   | Op of op
+  | Uop of uop
   | Lparen
   | Rparen
   | Lcurly
