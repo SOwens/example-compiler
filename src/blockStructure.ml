@@ -220,7 +220,9 @@ let build_cfg (stmts : S.stmt list) : cfg =
       raise Todo
     | S.Stmts s1 :: s2 ->
       find_blocks block_num ret_block (s1 @ s2) block_acc
-    | S.DoWhile (s_head, e, s1) :: s2 ->
+    | S.DoWhile (s0, e, s1) :: s2 ->
+      raise Todo
+        (*
       let (i, s3) = exp_to_atomic_test e in
       let header_block_n = get_block_num () in
       let body_block_n = get_block_num () in
@@ -234,6 +236,7 @@ let build_cfg (stmts : S.stmt list) : cfg =
         add_block header_block_n s3
           (Branch (i, body_block_n, following_block_n));
         find_blocks following_block_n ret_block s2 []
+           *)
     | S.Ite (e, s1, s2) :: s3 ->
       let (i, s4) = exp_to_atomic_test e in
       let true_block_n = get_block_num () in

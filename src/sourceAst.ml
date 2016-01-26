@@ -38,9 +38,9 @@ type stmt =
   | Assign of id * exp list * exp
   (* A generalised do/while loop. Always execute the first statement, then
      the test, then repeatedly do the 2nd, then first statement and then test 
-     'while e s' becomes DoWhile (None, e, s) and 'do s while e' becomes
-     DoWhile (s, e, None) *)
-  | DoWhile of stmt option * exp * stmt option
+     'while e s' becomes DoWhile (Stmts [], e, s) and 'do s while e' becomes
+     DoWhile (s, e, Stmts []) *)
+  | DoWhile of stmt * exp * stmt
   | Ite of exp * stmt * stmt
   | Stmts of stmt list
   | In of id
@@ -112,13 +112,13 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
   | (T.While, ln) :: toks ->
     let (e, toks1) = parse_exp toks in
     let (s, toks2) = parse_stmt toks1 in
-    (Loc (DoWhile (None, e, Some s), ln), toks2)
+    (Loc (DoWhile (Stmts [], e, s), ln), toks2)
   | (T.Do, ln) :: toks ->
     let (s, toks1) = parse_stmt toks in
     (match toks1 with
      | (T.While, _)::toks2 ->
        let (e, toks3) = parse_exp toks2 in
-       (Loc (DoWhile (None, e, Some s), ln), toks3)
+       (Loc (DoWhile (s, e, Stmts []), ln), toks3)
      | _ -> parse_error ln "'do' without 'while'")
   | (T.If, ln) :: toks ->
     (match parse_exp toks with

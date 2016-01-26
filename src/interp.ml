@@ -121,11 +121,6 @@ let rec interp_exp (store : store_t) (e : exp) : val_t =
     in
     Varray (indices, Array.make (List.fold_right (fun x y -> x * y) indices 1) 0L)
 
-let my_option_map f default o =
-  match o with
-  | None -> default
-  | Some x -> f x
-
 (* Run a statement *)
 let rec interp_stmt (store : store_t) (s : stmt) : store_t =
   match s with
@@ -148,11 +143,11 @@ let rec interp_stmt (store : store_t) (s : stmt) : store_t =
      | Vint _ ->
        raise TypeError)
   | DoWhile (head_s, e, body_s) ->
-    let s1 = my_option_map (interp_stmt store) store head_s in
+    let s1 = interp_stmt store head_s in
     if not (int64_to_bool (val_t_to_int (interp_exp s1 e))) then
       s1
     else
-      let s2 = my_option_map (interp_stmt s1) s1 body_s in
+      let s2 = interp_stmt s1 body_s in
       interp_stmt s2 s
   | Ite (e, s1, s2) ->
     if int64_to_bool (val_t_to_int (interp_exp store e)) then

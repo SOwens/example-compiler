@@ -34,9 +34,9 @@ type stmt =
   | Assign of id * exp list * exp
   (* A generalised do/while loop. Always execute the first statement, then
      the test, then repeatedly do the 2nd, then first statement and then test 
-     'while e s' becomes DoWhile (None, e, s) and 'do s while e' becomes
-     DoWhile (s, e, None) *)
-  | DoWhile of stmt option * exp * stmt option
+     'while e s' becomes DoWhile (Stmts [], e, s) and 'do s while e' becomes
+     DoWhile (s, e, Stmts []) *)
+  | DoWhile of stmt * exp * stmt
   | Ite of exp * stmt * stmt
   | Stmts of stmt list
   | In of id
