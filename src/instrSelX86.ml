@@ -199,6 +199,14 @@ let rec be_to_x86 (underscore_labels : bool) be =
     [Zmov (Zr_rm (RDI, var_to_rm v));
      Zcall ((if underscore_labels then "_" else "") ^ "output")] @
     caller_restore
+  | Alloc _ ->
+    raise Todo
+
+let test_to_x86 ae1 ae2 =
+  raise Todo
+
+let op_to_cc b op =
+  raise Todo
 
 let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int) : instruction list =
   (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
@@ -216,9 +224,9 @@ let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int) : i
        (fun l ->
           match l with
           | L.Instr be -> be_to_x86 underscore_labels be
-          | L.CJump (v, b, s) ->
-            [Zbinop (Zcmp, Zrm_i (var_to_rm v, 0L));
-             Zjcc ((if b then Z_NE else Z_E), s)]
+          | L.CJump ((ae1, op, ae2), b, s) ->
+            [test_to_x86 ae1 ae2;
+             Zjcc (op_to_cc b op, s)]
           | L.Jump s ->
             [Zjcc (Z_ALWAYS, s)]
           | L.Label s ->

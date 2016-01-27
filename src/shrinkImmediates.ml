@@ -21,6 +21,7 @@
    arguments, and we maintain that property here. *)
 
 open BlockStructure
+exception Todo
 
 (* Build a series of assignments that puts the immediate n into the dest register, using
    only immediates of 32 bits or smaller *)
@@ -41,7 +42,7 @@ let get_large_imm (a : atomic_exp) : int64 option =
     if Int64.compare topmost 0L = 0 ||
        Int64.compare topmost 0xFFFFFFFFFFFFFFFFL = 0 then
       None
-    else 
+    else
       Some n
   | _ -> None
 
@@ -57,10 +58,10 @@ let shrink_imm_elem (tmp_reg : var) (e : block_elem) : block_elem list =
       | None ->
         begin
           match get_large_imm a2 with
-          | Some n -> 
+          | Some n ->
             assign_imm tmp_reg n @
             [AssignOp (dest, a1, op, Ident tmp_reg)]
-          | None -> 
+          | None ->
             [e]
         end
     end
@@ -74,9 +75,11 @@ let shrink_imm_elem (tmp_reg : var) (e : block_elem) : block_elem list =
   | St (r, addr) -> [e]
   | In r -> [e]
   | Out r -> [e]
+  | Alloc _ ->
+    raise Todo
 
 let shrink_imm (cfg : cfg) : cfg =
-  List.map 
+  List.map
     (fun cfg_entry ->
        { cfg_entry with elems = List.flatten (List.map (shrink_imm_elem (NamedTmp 0)) cfg_entry.elems) })
     cfg

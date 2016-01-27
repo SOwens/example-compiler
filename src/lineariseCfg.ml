@@ -18,22 +18,20 @@
 
 open BlockStructure
 
-(* For now this uses naive quadratic graphs algorithms *)
-
-type linear = 
+type linear =
   | Instr of block_elem
-  | CJump of var * bool * string (* jump to string if var is bool *)
+  | CJump of test * bool * string (* jump to string if var is bool *)
   | Jump of string
   | Label of string
   [@@deriving show]
 
 let pp_linear fmt l =
-  match l with 
+  match l with
   | Instr b ->
     Format.fprintf fmt "  %a@\n" pp_block_elem b
   | CJump (v, b, s) ->
-    Format.fprintf fmt "  if %a = %s goto %s@\n" 
-      pp_var v
+    Format.fprintf fmt "  if %a = %s goto %s@\n"
+      pp_test v
       (if b then "true" else "false")
       s
   | Jump s ->
@@ -44,8 +42,8 @@ let pp_linear fmt l =
 type linear_list = linear list
   [@@deriving show]
 
-let rec pp_linear_list fmt ls = 
-  match ls with 
+let rec pp_linear_list fmt ls =
+  match ls with
   | [] -> ()
   | x::y ->
     (pp_linear fmt x;
@@ -95,14 +93,14 @@ let rec cfg_to_linear (next_block : int) (cfg : cfg_entry I.t) : linear list =
        | (true, true) ->
          [CJump (v, true, "block"  ^ string_of_int t1);
           Jump ("block" ^ string_of_int t2)]
-       | (true, false) -> 
+       | (true, false) ->
          (c2.started <- true;
           [CJump (v, true, "block"  ^ string_of_int t1)] @
           cfg_to_linear t2 cfg)
-       | (false, true) -> 
+       | (false, true) ->
          (c1.started <- true;
           [CJump (v, false, "block"  ^ string_of_int t2)] @
           cfg_to_linear t1 cfg))
 
-let cfg_to_linear cfg = 
+let cfg_to_linear cfg =
   cfg_to_linear 1 (init_traversal cfg)

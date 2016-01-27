@@ -18,6 +18,7 @@
 
 open Util
 open BlockStructure
+exception Todo
 
 type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }
     [@@deriving show]
@@ -34,15 +35,15 @@ let add_gen (a : atomic_exp) (gen : Varset.t) : Varset.t =
 (* Compute the gen and kill sets for a basic block, live_exit is set to empty *)
 let analyse_block (b : basic_block) : cfg_annot =
   let rec analyse_block gen kill b =
-    match b with 
+    match b with
     | [] -> (gen, kill)
     | AssignOp (i, a1, op, a2) :: b ->
-      analyse_block (add_gen a1 (add_gen a2 (Varset.remove i gen))) 
-        (Varset.add i kill) 
+      analyse_block (add_gen a1 (add_gen a2 (Varset.remove i gen)))
+        (Varset.add i kill)
         b
     | AssignAtom (i, a) :: b ->
       analyse_block (add_gen a (Varset.remove i gen)) (Varset.add i kill) b
-    | Ld (i, addr) :: b -> 
+    | Ld (i, addr) :: b ->
       analyse_block (Varset.remove i gen) (Varset.add i kill) b
     | St (i, addr) :: b ->
       analyse_block (Varset.add i gen) kill b
@@ -50,13 +51,14 @@ let analyse_block (b : basic_block) : cfg_annot =
       analyse_block (Varset.remove i gen) (Varset.add i kill) b
     | Out i :: b ->
       analyse_block (Varset.add i gen) kill b
+    | Alloc _ :: b -> raise Todo
   in
   let (gen,kill) = analyse_block Varset.empty Varset.empty (List.rev b) in
   { gen = gen; kill = kill; live_exit = Varset.empty }
 
 (* Split the annotated cfg into the predecessors of node n, and the other nodes *)
 let rec find_preds n cfg =
-  List.partition 
+  List.partition
     (fun (entry, annots) ->
        match entry.next with
        | End -> false
@@ -69,8 +71,8 @@ let rec find_preds n cfg =
 (* Do live variable analysis, returning an annotated cfg *)
 let lva (cfg : BlockStructure.cfg) : cfg =
   (* Initial annotations for all of the blocks *)
-  let init_worklist = 
-    List.map (fun entry -> (entry, analyse_block entry.elems)) cfg 
+  let init_worklist =
+    List.map (fun entry -> (entry, analyse_block entry.elems)) cfg
   in
   (* The worklist and finished_list partition the whole cfg. That is, they must
      contain all of the blocks between them, with no duplication *)
@@ -86,12 +88,12 @@ let lva (cfg : BlockStructure.cfg) : cfg =
           (fun (entry, annot) -> Varset.subset live_entry annot.live_exit)
           possible_updates
       in
-      let new_worklist = 
-        List.map 
+      let new_worklist =
+        List.map
           (fun (entry, annot) ->
              (entry, { annot with live_exit = Varset.union annot.live_exit live_entry}))
           (updates @ updates')
-        @ 
+        @
         worklist
       in
       do_one new_worklist (finished' @ finished)
@@ -113,7 +115,7 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list) :
       local_remove_unused_writes (add_gen a (Varset.remove i live)) b
     else
       local_remove_unused_writes live b
-  | Ld (i, addr) :: b -> 
+  | Ld (i, addr) :: b ->
     if Varset.mem i live then
       Ld (i, addr) ::
       local_remove_unused_writes (Varset.remove i live) b
@@ -128,14 +130,25 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list) :
       local_remove_unused_writes live b
   | Out i :: b ->
     Out i :: local_remove_unused_writes (Varset.add i live) b
+  | Alloc _ :: b -> raise Todo
+
+let add_test_vars (ae1, op, ae2) vars =
+  let vars' =
+    match ae1 with
+    | Ident v -> Varset.add v vars
+    | _ -> vars
+  in
+  match ae2 with
+    | Ident v -> Varset.add v vars'
+    | _ -> vars'
 
 let add_exit_var (nb : next_block) (vars : Varset.t) : Varset.t =
   match nb with
   | End | Next _ -> vars
-  | Branch (v, _, _) -> Varset.add v vars
+  | Branch (t, _, _) -> add_test_vars t vars
 
 let remove_unused_writes (cfg : cfg) : cfg =
-  List.map 
+  List.map
     (fun (entry, annot) ->
        let new_elems = local_remove_unused_writes (add_exit_var entry.next annot.live_exit) (List.rev entry.elems) in
        ({entry with elems = List.rev new_elems}, annot))

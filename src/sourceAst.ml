@@ -16,8 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* The language's AST, and a recursive descent parser. See the README for the
-   grammar. *)
+(* The language's AST, and a predictive, recursive descent parser. See the
+   ../README.md for the grammar. *)
 
 open Util
 module T = Tokens
@@ -65,12 +65,16 @@ type stmt =
   | Loc of stmt * int (* annotate a statement with it's source line number *)
   [@@deriving show]
 
+let pp_stmts fmt (stmts : stmt list) : unit =
+  Format.fprintf fmt "%a"
+    (pp_list pp_stmt) stmts
+
 (* Raise a parse error *)
 let parse_error (ln : int) (msg : string) : 'a =
   raise (BadInput ("Parse error on line " ^ string_of_int ln ^ ": " ^ msg))
 
 (* Convert the first expression in toks into an AST. Return it with the left
-   over tokens *)
+   over tokens. *)
 let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   match toks with
   | [] -> raise (BadInput "End of file while parsing an expression")
@@ -120,10 +124,12 @@ and parse_indices (toks : T.tok_loc list) : exp list * T.tok_loc list =
 let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
   match toks with
   | [] -> raise (BadInput "End of file while parsing a statement")
-  | (T.Ident x, ln) :: (T.Assign, _) :: toks ->
-    let (e, toks) = parse_exp toks in
-    let (indices, toks) = parse_indices toks in
-    (Loc (Assign (Source x, indices, e), ln), toks)
+  | (T.Ident x, ln) :: toks ->
+    (match parse_indices toks with
+     | (indices, (T.Assign, _) :: toks) ->
+       let (e, toks) = parse_exp toks in
+       (Loc (Assign (Source x, indices, e), ln), toks)
+     |_ -> parse_error ln "expected ':=' after identifier")
   | (T.While, ln) :: toks ->
     let (e, toks) = parse_exp toks in
     let (s, toks) = parse_stmt toks in
@@ -147,8 +153,7 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
     let (s_list, toks) = parse_stmt_list toks in
     (Loc (Stmts (s_list), ln), toks)
   | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In (Source x), ln), toks)
-  | (T.Output, ln) :: (T.Ident x, _) :: toks ->
-    (Loc (Out (Source x), ln), toks)
+  | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out (Source x), ln), toks)
   | (_,ln) :: _ ->
     parse_error ln "Bad statement"
 

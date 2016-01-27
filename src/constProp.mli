@@ -19,4 +19,4 @@
 (* Do constant propagation and folding *)
 
 open SourceAst
-val prop_stmts : exp Util.Strmap.t -> stmt list -> exp Util.Strmap.t * stmt list
+val prop_stmts : exp Idmap.t -> stmt list -> exp Idmap.t * stmt list

@@ -22,6 +22,7 @@
 open SourceAst
 module T = Tokens
 
+(*
 (* Get rid of booleans, &&, and || on the right of an assignment. Rely on the
    fact that they have to be at the top level of an expression (due to the type
    system), so we don't have to worry about 1 + (a && b) etc. Necessary to
@@ -100,3 +101,6 @@ let rec remove_and_or_stmt (s : stmt) : stmt list =
 
 and remove_and_or (sl : stmt list) : stmt list =
   List.flatten (List.map remove_and_or_stmt sl)
+   *)
+exception Todo
+let remove_and_or s = raise Todo

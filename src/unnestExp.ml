@@ -1,8 +1,63 @@
+(*
+ * Example compiler
+ * Copyright (C) 2015-2016 Scott Owens
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*)
+
+(* Flatten expressions so that they follow this grammar. We don't introduce a
+   new type, but do define predicates on the SourceAst.exp type.
+
+   type ae =
+   | Num of int64
+   | Bool of bool
+   | Ident of SourceAst.id
+
+   type flat_exp =
+   | Num of int64
+   | Bool of bool
+   | Ident of SourceAst.id * ae list
+   | Op of ae * op * ae
+   | Uop of ae
+   | Array of ae list
+ *)
+
 open Util
 open SourceAst
 module T = Tokens
 
 exception Todo
+
+let is_atomic (e : exp) : bool =
+  match e with
+  | Num _ -> true
+  | Bool _ -> true
+  | Ident (_, []) -> true
+  | Ident (_, es) -> false
+  | Op _ -> false
+  | Uop _ -> false
+  | Array _ -> false
+
+let is_flat (e : exp) : bool =
+  match e with
+  | Num _ -> true
+  | Bool _ -> true
+  | Ident (_, []) -> true
+  | Ident (_, es) -> List.for_all is_atomic es
+  | Op (e1, op, e2) -> is_atomic e1 && is_atomic e2
+  | Uop (uop, e) -> is_atomic e
+  | Array es -> List.for_all is_atomic es
 
 let rec unnest (stmts : stmt list) : stmt list =
 
@@ -14,35 +69,17 @@ let rec unnest (stmts : stmt list) : stmt list =
     Temp x
   in
 
-  let is_atomic (e : exp) : bool =
-    match e with
-    | Num _ -> true
-    | Bool _ -> true
-    | Ident (_, []) -> true
-    | Ident (_, es) -> false
-    | Op _ -> false
-    | Uop _ -> false
-    | Array _ -> false
-  in
-
-  let is_flat (e : exp) : bool =
-    match e with
-    | Num _ -> true
-    | Bool _ -> true
-    | Ident (_, []) -> true
-    | Ident (_, es) -> List.for_all is_atomic es
-    | Op (e1, op, e2) -> is_atomic e1 && is_atomic e2
-    | Uop (uop, e) -> is_atomic e
-    | Array es -> List.for_all is_atomic es
-  in
-
-  (* Turn off warning about unused is_flat *)
-  let _ = ignore (is_flat (Num 1L)) in
-
   (* Flatten out and expression into a list of statements and an expression by
      using temporary variables to store the results of each sub-expression. The
      expression returned satisfies is_flat above, and the statement are
-     assignments of flat expressions to non-array identifiers *)
+     assignments of flat expressions to non-array identifiers.
+
+     Warning: As implemented, this is O(n^2) because of the list appending.
+     This is unlikely to matter for human written code, as it is O(n^2) where n
+     is the size of an expression, not the whole program. However, for
+     compiling machine-generated code, this could be a problem. A little care
+     could be taken to collect results in a tree-structure and then convert it
+     into a list. *)
   let rec unnest_exp (e : exp) : stmt list * exp =
     match e with
     | Num i -> ([], Num i)

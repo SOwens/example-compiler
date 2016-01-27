@@ -17,7 +17,7 @@
 *)
 
 (* An interpreter. There is code at the bottom of the file that calls the
-   interpreter, making this suitable for compilation into an executable. *)
+   interpreter, making this a top-level OCaml compilation target *)
 
 open Util
 open SourceAst
@@ -31,7 +31,8 @@ exception TypeError
 
 (* Values are either integers or n-dimensional arrays of integers.
    We keep multi-dimensional arrays in a single dimensional one and include a
-   list of how big each dimension is. *)
+   list of how big each dimension is.
+   We represent bools as numbers: true = 1L and false = 0L *)
 type val_t =
   | Vint of int64
   | Varray of int list * int64 array
@@ -87,13 +88,21 @@ let do_op op (n1 : int64) (n2 : int64) : int64 =
   | T.Lt -> bool_to_int64 (Int64.compare n1 n2 < 0)
   | T.Gt -> bool_to_int64 (Int64.compare n1 n2 > 0)
   | T.Eq -> bool_to_int64 (Int64.compare n1 n2 = 0)
-  | T.Lshift -> Int64.shift_left n1 (Int64.to_int n2)
+  | T.Lshift ->
+    let i = Int64.to_int n2 in
+    (* Int64.shift_left is wacky outside of this interval *)
+    if 0 <= i && i < 64 then
+      Int64.shift_left n1 i
+    else
+      0L
   | T.BitOr -> Int64.logor n1 n2
   | T.BitAnd -> Int64.logand n1 n2
   | T.And | T.Or -> assert false
 
 let do_uop uop (n : int64) : int64 =
-  bool_to_int64 (not (int64_to_bool n))
+  match uop with
+  | T.Not ->
+    bool_to_int64 (not (int64_to_bool n))
 
 (* Compute the value of an expression *)
 let rec interp_exp (store : store_t) (e : exp) : val_t =
@@ -101,19 +110,14 @@ let rec interp_exp (store : store_t) (e : exp) : val_t =
   | Ident (i, []) ->
     Idmap.find i store (* i will be in the store in a well-typed program *)
   | Ident (i, iexps) ->
-    (match Idmap.find i store with
-     | Varray (sizes, a) ->
-       (let indices =
-          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
-            iexps
-        in
-        match array_address sizes indices with
-        | None ->
-          raise (Crash "array index out of bounds")
-        | Some x ->
-          Vint (Array.get a x))
-     | Vint _ ->
-       raise TypeError)
+    let (sizes, a) = val_t_to_array (Idmap.find i store) in
+    let indices =
+      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
+        iexps
+    in
+    (match array_address sizes indices with
+     | Some x -> Vint (Array.get a x)
+     | None -> raise (Crash "array index out of bounds"))
   | Num n -> Vint n
   | Bool b -> Vint (bool_to_int64 b)
   | Op (e1, T.And, e2) ->
@@ -134,10 +138,8 @@ let rec interp_exp (store : store_t) (e : exp) : val_t =
      | _ -> raise TypeError)
   | Op (e1, op, e2) ->
     (match (interp_exp store e1, interp_exp store e2) with
-     | (Vint n1, Vint n2) ->
-       Vint (do_op op n1 n2)
-     | _ ->
-       raise TypeError)
+     | (Vint n1, Vint n2) -> Vint (do_op op n1 n2)
+     | _ -> raise TypeError)
   | Uop (uop, e) ->
     (match interp_exp store e with
      | Vint n -> Vint (do_uop uop n)
@@ -160,17 +162,16 @@ let rec interp_stmt (store : store_t) (s : stmt) : store_t =
     (match Idmap.find i store with
      | Varray (sizes, a) ->
        (let indices =
-          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e)))) iexps
+          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
+            iexps
         in
         match array_address sizes indices with
-        | None ->
-          raise (Crash "array index out of bounds")
+        | None -> raise (Crash "array index out of bounds")
         | Some x ->
           let v = val_t_to_int (interp_exp store e) in
           Array.set a x v;
           store)
-     | Vint _ ->
-       raise TypeError)
+     | Vint _ -> raise TypeError)
   | DoWhile (head_s, e, body_s) ->
     let s1 = interp_stmt store head_s in
     if not (int64_to_bool (val_t_to_int (interp_exp s1 e))) then

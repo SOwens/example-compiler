@@ -20,7 +20,8 @@
 
 open Util
 
-let front_end (filename : string) (print_intermediates : bool) : SourceAst.stmt list =
+let front_end (filename : string) (print_intermediates : bool)
+  : SourceAst.stmt list =
   if Filename.check_suffix filename ".expl" then
     let input = Std.input_file filename in
     let toks = Tokens.lex input 0 1 in

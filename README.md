@@ -66,7 +66,7 @@ op ::=
 | `&&` --- Logical and
 
 uop ::=~~
-| `!`  --- Logical negation
+| `!`  --- Logical negation~~
 | `-`  --- Unary minus
 
 indices ::=  

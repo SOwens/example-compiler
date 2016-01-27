@@ -16,27 +16,30 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* The main driver for the compiler *)
+
 open Util
 open Format
 
+(* Command-line arguments *)
 let osx = ref false;;
 let filename_ref = ref None;;
 
 let options = Arg.align ([
-  ( "-osx", 
+  ( "-osx",
     Arg.Set osx,
     " generate assembler for OS X");
-   ( "-linux", 
+   ( "-linux",
     Arg.Clear osx,
     " generate assembler for Linux (default)");
   ]);;
 
-let usage_msg = 
-  "example compiler \nexample usage:       compile.byte test.expl\n" 
-    
-let _ = 
-  Arg.parse options 
-    (fun s -> 
+let usage_msg =
+  "example compiler \nexample usage:       compile.byte test.expl\n"
+
+let _ =
+  Arg.parse options
+    (fun s ->
        match !filename_ref with
        | None ->
          filename_ref := Some s
@@ -45,32 +48,30 @@ let _ =
           exit 1))
     usage_msg
 
-let filename = 
+let filename =
  match !filename_ref with
   | None ->
     (print_string usage_msg;
      exit 1)
   | Some filename ->
     filename
-  
-let ast = 
-   FrontEnd.front_end filename false;;
 
-let (_,opt_ast) = ConstProp.prop_stmts Strmap.empty ast;;
+let ast = FrontEnd.front_end filename false;;
+
+let (_,opt_ast) = ConstProp.prop_stmts SourceAst.Idmap.empty ast;;
+(* printf "@\n%a@\n" SourceAst.pp_stmts opt_ast;; *)
+
 (*
-print_newline ();;
-print_string ([%show: SourceAst.stmt list] opt_ast);;
-print_newline ();;
-   *)
-
 let no_bool_ast = RemoveBool.remove_and_or opt_ast;;
-(*
 print_newline ();;
 print_string ([%show: SourceAst.stmt list] no_bool_ast);;
 print_newline ();;
    *)
 
-let cfg = BlockStructure.build_cfg no_bool_ast;;
+let no_nest_ast = UnnestExp.unnest opt_ast;;
+(* printf "@\n%a@\n" SourceAst.pp_stmts opt_ast;; *)
+
+let cfg = BlockStructure.build_cfg no_nest_ast;;
 (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg;; *)
 
 let cfg' = ShrinkImmediates.shrink_imm cfg;;
@@ -117,6 +118,7 @@ let under = if !osx then "_" else "";;
 let x86 = InstrSelX86.to_x86 (!osx) linear num_stack;;
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
+(* Assembly wrapper *)
 fprintf fmt "[section .text align=16]@\n";;
 fprintf fmt "global %smain@\n@\n" under;;
 fprintf fmt "extern %sinput@\n" under;;
@@ -124,9 +126,9 @@ fprintf fmt "extern %soutput@\n@\n" under;;
 fprintf fmt "%smain:@\n" under;;
 fprintf fmt "%a" X86.pp_instr_list x86;;
 (* Prepare for exit system call *)
-fprintf fmt "exit:";; 
+fprintf fmt "exit:";;
 fprintf fmt "  mov rax, 0@\n";; (* Exit with 0, e.g. success *)
-fprintf fmt "  leave@\n";; 
+fprintf fmt "  leave@\n";;
 fprintf fmt "  ret@\n@\n";;
 (* OS X crashes if there isn't a data segment with something in it *)
 fprintf fmt "[section .data align=16]@\n";;

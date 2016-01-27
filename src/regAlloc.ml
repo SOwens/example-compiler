@@ -18,6 +18,7 @@
 
 open Util
 open BlockStructure
+exception Todo
 
 (* The basic type signature of a monad *)
 module type Monad = sig
@@ -125,6 +126,18 @@ let count_vars_be (be : block_elem) : unit M.t =
     M.do_ ;
     () <-- M.inc_var r;
     return ()
+  | Alloc _ ->
+    raise Todo
+
+let count_vars_test (ae1, op, ae2) : unit M.t =
+  let vars =
+    match (ae1, ae2) with
+    | (Ident v1, Ident v2) -> [v1;v2]
+    | (Ident v1, Num _) -> [v1]
+    | (Num _, Ident v1) -> [v1]
+    | (Num _, Num _) -> []
+  in
+  mapM_ M.inc_var vars
 
 let count_vars_nb (nb : next_block) : unit M.t =
   match nb with
@@ -132,7 +145,7 @@ let count_vars_nb (nb : next_block) : unit M.t =
   | Next i -> M.return ()
   | Branch (r, t1, t2) ->
     M.do_ ;
-    () <-- M.inc_var r;
+    () <-- count_vars_test r;
     return ()
 
 let count_vars (cfg : cfg) : int Varmap.t =
@@ -152,7 +165,7 @@ let count_vars (cfg : cfg) : int Varmap.t =
 
 let reg_alloc_ae (map : var Varmap.t) (ae : atomic_exp) : atomic_exp =
   match ae with
-  | Ident v -> 
+  | Ident v ->
     Ident (Varmap.find v map)
   | Num x -> Num x
 
@@ -170,13 +183,18 @@ let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
     In (Varmap.find v map)
   | Out v ->
     Out (Varmap.find v map)
+  | Alloc _ ->
+    raise Todo
+
+let reg_alloc_test (map : var Varmap.t) (ae1, op, ae2) : test =
+  (reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)
 
 let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
   match nb with
   | End -> End
   | Next i -> Next i
-  | Branch (v, t1, t2) ->
-    Branch (Varmap.find v map, t1, t2)
+  | Branch (t, t1, t2) ->
+    Branch (reg_alloc_test map t, t1, t2)
 
 (* The returned int is the number of variables put on the stack *)
 let reg_alloc (num_regs : int) (cfg : cfg) : (cfg * int) =

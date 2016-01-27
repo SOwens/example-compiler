@@ -17,9 +17,9 @@
 *)
 
 open BlockStructure
-type linear = 
+type linear =
   | Instr of block_elem
-  | CJump of var * bool * string (* jump to string if var is bool *)
+  | CJump of test * bool * string (* jump to string if var is bool *)
   | Jump of string
   | Label of string
   [@@deriving show]

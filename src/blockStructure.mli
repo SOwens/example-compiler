@@ -48,9 +48,19 @@ type block_elem =
   | St of var * atomic_exp
   | In of var
   | Out of var
+  | Alloc of atomic_exp list
   [@@deriving show]
 
 type basic_block = block_elem list
+  [@@deriving show]
+
+type test_op =
+  | Lt
+  | Gt
+  | Eq
+  [@@deriving show]
+
+type test = atomic_exp * test_op * atomic_exp
   [@@deriving show]
 
 type next_block =
@@ -58,12 +68,13 @@ type next_block =
   | Next of int
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
-  | Branch of var * int * int
+  | Branch of test * int * int
   [@@deriving show]
 
 type cfg_entry = { bnum : int; elems : block_elem list; next : next_block;
                    mutable started : bool; mutable finished : bool }
   [@@deriving show]
+
 type cfg = cfg_entry list
   [@@deriving show]
 

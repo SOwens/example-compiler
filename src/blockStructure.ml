@@ -22,8 +22,6 @@
 open Util
 module S = SourceAst
 
-exception Todo
-
 type var =
   | Vreg of int
   | Stack of int
@@ -77,6 +75,7 @@ type block_elem =
   | St of var * atomic_exp
   | In of var
   | Out of var
+  | Alloc of atomic_exp list
   [@@deriving show]
 
 let pp_block_elem fmt be =
@@ -105,9 +104,33 @@ let pp_block_elem fmt be =
   | Out v ->
     Format.fprintf fmt "output %a"
       pp_var v
+  | Alloc vs ->
+    Format.fprintf fmt "alloc%a"
+      (pp_list pp_atomic_exp) vs
 
 type basic_block = block_elem list
   [@@deriving show]
+
+type test_op =
+  | Lt
+  | Gt
+  | Eq
+  [@@deriving show]
+
+let pp_test_op fmt op =
+  match op with
+  | Lt -> Format.fprintf fmt "<"
+  | Gt -> Format.fprintf fmt ">"
+  | Eq -> Format.fprintf fmt "="
+
+type test = atomic_exp * test_op * atomic_exp
+  [@@deriving show]
+
+let pp_test fmt (ae1, op, ae2) =
+  Format.fprintf fmt "%a %a %a"
+    pp_atomic_exp ae1
+    pp_test_op op
+    pp_atomic_exp ae2
 
 (* A basic block is either at the end of the program, or there is an
    unconditional jump out of it, or a branch out of it. This type represents
@@ -117,15 +140,15 @@ type next_block =
   | Next of int
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
-  | Branch of var * int * int
+  | Branch of test * int * int
   [@@deriving show]
 
 let pp_next_block fmt nb =
   match nb with
   | End -> Format.fprintf fmt "END"
   | Next i -> Format.fprintf fmt "B%d" i
-  | Branch (v,i1,i2) -> Format.fprintf fmt "if@ %a@ then@ B%d@ else@ B%d"
-                          pp_var v
+  | Branch (t,i1,i2) -> Format.fprintf fmt "if@ %a@ then@ B%d@ else@ B%d"
+                          pp_test t
                           i1
                           i2
 
@@ -143,6 +166,64 @@ let pp_cfg_entry fmt e =
 
 type cfg = cfg_entry list
   [@@deriving show]
+
+let id_to_var (i : S.id) : var =
+  match i with
+  | S.Source s -> NamedSource s
+  | S.Temp i -> NamedTmp i
+
+let exp_to_atomic (e : S.exp) : atomic_exp =
+  match e with
+  | S.Ident (id, []) -> Ident (id_to_var id)
+  | S.Ident (id, _) ->
+    raise (InternalError "array index in blockStructure")
+  | S.Num n -> Num n
+  | S.Bool _ ->
+    raise (InternalError "bool in blockStructure")
+  | S.Op _ | S.Uop _ | S.Array _ ->
+    raise (InternalError "non-flat expression in blockStructure")
+
+let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem =
+  let v = id_to_var x in
+  match e with
+  | S.Ident (id, []) ->
+    AssignAtom (v, Ident (id_to_var id))
+  | S.Ident (id, _) ->
+    raise (InternalError "array index in blockStructure")
+  | S.Num n ->
+    AssignAtom (v, Num n)
+  | S.Bool _ ->
+    raise (InternalError "bool in blockStructure")
+  | S.Op (ae1, op, ae2) ->
+    AssignOp (v, exp_to_atomic ae1, op, exp_to_atomic ae2)
+  | S.Uop (Tokens.Not, ae) ->
+    raise (InternalError "not in blockStructure")
+  | S.Array es ->
+    Alloc (List.map exp_to_atomic es)
+
+let op_to_test_op op =
+  match op with
+  | Tokens.Lt -> Lt
+  | Tokens.Gt -> Gt
+  | Tokens.Eq -> Eq
+  | _ -> raise (InternalError "non-test operator in test in blockStructure")
+
+let flat_exp_to_test (e : S.exp) : test =
+  match e with
+  | S.Ident (id, []) ->
+    (Num 1L, Eq, Ident (id_to_var id))
+  | S.Ident (id, _) ->
+    raise (InternalError "array index in blockStructure")
+  | S.Num n ->
+    raise (InternalError "constant in test position in blockStructure")
+  | S.Bool _ ->
+    raise (InternalError "bool in blockStructure")
+  | S.Op (ae1, op, ae2) ->
+    (exp_to_atomic ae1, op_to_test_op op, exp_to_atomic ae2)
+  | S.Uop (Tokens.Not, ae) ->
+    raise (InternalError "! in blockStructure")
+  | S.Array es ->
+    raise (InternalError "array alloc test in blockStructure")
 
 
 
@@ -163,62 +244,69 @@ let build_cfg (stmts : S.stmt list) : cfg =
                  started = false; finished = false} :: !the_cfg
   in
 
-  (* Convert stmts to basic blocks, and add them to the_cfg. block_num is the
-     index for the first block, ret_block for the block to return to after
-     stmts. block_acc accumulates the block that we've seen so far. *)
-  let rec find_blocks (block_num : int) (ret_block : int) (stmts : S.stmt list) (block_acc : basic_block) : unit =
+  (* Convert stmts to basic blocks, and add them to the_cfg.
+     block_num is the index for the block being created.
+     block_acc contains the elements seen so far, in reverse order.
+     ret_block is the control flow out of the block being created.
+
+     The AST must be in a restricted form:
+     - The expressions must all be unnested 
+       (i.e. UnnestExp.is_flat returns true).
+     - Booleans (and && || !) must have been removed.
+     - Array indexing must have been removed. *)
+  let rec find_blocks (block_num : int) (block_acc : basic_block)
+      (ret_block : next_block) (stmts : S.stmt list) : unit =
     match stmts with
     | [] ->
-      add_block block_num block_acc (Next ret_block)
+      add_block block_num block_acc ret_block
     | S.Assign (x, [], e) :: s1 ->
-      let (a, s2) = exp_to_atomic e in
-      find_blocks block_num ret_block s1
-        (AssignAtom (NamedSource x, a) :: s2 @ block_acc)
+      find_blocks block_num (flat_e_to_assign x e :: block_acc) ret_block s1
     | S.Assign (x, es, e) :: s1 ->
-      raise Todo
+      raise (InternalError "Array index in blockStructure")
     | S.Stmts s1 :: s2 ->
-      find_blocks block_num ret_block (s1 @ s2) block_acc
+      (* Treat { s1 ... sn } s1' ... sn' as though it were
+         s1 ... sn s1' ... sn' *)
+      find_blocks block_num block_acc ret_block (s1 @ s2)
     | S.DoWhile (s0, e, s1) :: s2 ->
-      raise Todo
-        (*
-      let (i, s3) = exp_to_atomic_test e in
       let header_block_n = get_block_num () in
       let body_block_n = get_block_num () in
       add_block block_num block_acc (Next header_block_n);
-      find_blocks body_block_n header_block_n [s1] [];
-      if s2 = [] then
-        add_block header_block_n s3
-          (Branch (i, body_block_n, ret_block))
-      else
-        let following_block_n = get_block_num () in
-        add_block header_block_n s3
-          (Branch (i, body_block_n, following_block_n));
-        find_blocks following_block_n ret_block s2 []
-           *)
+      find_blocks body_block_n [] (Next header_block_n) [s1];
+      (match (s2, ret_block) with
+       | ([], Next i) ->
+         find_blocks header_block_n []
+           (Branch (flat_exp_to_test e, body_block_n, i))
+           [s0]
+       | _ ->
+         let following_block_n = get_block_num () in
+         find_blocks header_block_n []
+           (Branch (flat_exp_to_test e, body_block_n, following_block_n))
+           [s0];
+         find_blocks following_block_n [] ret_block s2)
     | S.Ite (e, s1, s2) :: s3 ->
-      let (i, s4) = exp_to_atomic_test e in
       let true_block_n = get_block_num () in
       let false_block_n = get_block_num () in
-      add_block block_num (s4 @ block_acc)
-        (Branch (i, true_block_n, false_block_n));
+      add_block block_num block_acc
+        (Branch (flat_exp_to_test e, true_block_n, false_block_n));
       if s3 = [] then
-        (find_blocks true_block_n ret_block [s1] [];
-         find_blocks false_block_n ret_block [s2] [])
+        (find_blocks true_block_n [] ret_block [s1];
+         find_blocks false_block_n [] ret_block [s2])
       else
         let following_block_n = get_block_num () in
-        find_blocks true_block_n following_block_n [s1] [];
-        find_blocks false_block_n following_block_n [s2] [];
-        find_blocks following_block_n ret_block s3 []
+        find_blocks true_block_n [] (Next following_block_n) [s1];
+        find_blocks false_block_n [] (Next following_block_n) [s2];
+        find_blocks following_block_n [] ret_block s3
     | S.In x :: s ->
-      find_blocks block_num ret_block s (In (NamedSource x) :: block_acc)
+      find_blocks block_num (In (id_to_var x) :: block_acc) ret_block s
     | S.Out x :: s ->
-      find_blocks block_num ret_block s (Out (NamedSource x) :: block_acc)
+      find_blocks block_num (Out (id_to_var x) :: block_acc) ret_block s
     | ((S.Loc _) :: _) ->
       raise (InternalError "Loc in blockStructure")
   in
 
   let end_block_num = get_block_num () in
-  let init_block = get_block_num () in (* Later on we rely on the starting block being #1 *)
+  (* Later on we rely on the starting block being #1 *)
+  let init_block = get_block_num () in
   add_block end_block_num [] End;
-  find_blocks init_block end_block_num stmts [];
+  find_blocks init_block [] (Next end_block_num) stmts;
   !the_cfg

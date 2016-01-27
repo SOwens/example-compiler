@@ -91,6 +91,8 @@ let keywords =
    ("array",Array); (":=",Assign); ("true",True); ("input", Input);
    ("output",Output); ("false",False); ("(",Lparen); (")",Rparen);
    ("{",Lcurly); ("}",Rcurly); ("[",Lbrac); ("]",Rbrac);
+
+   (* Derive the mapping from the to_string functions to avoid duplication *)
    (uop_to_string Not, Uop Not)] @
   List.map (fun o -> (op_to_string o, Op o))
     [Plus; Minus; Times; Div; Lt; Gt; Eq; And; Or; Lshift; BitOr; BitAnd]
@@ -100,21 +102,18 @@ let keyword_map : token Strmap.t =
   List.fold_left (fun m (k,v) -> Strmap.add k v m) Strmap.empty keywords
 
 (* Regular expressions that describe various syntactic entities *)
+(* Build the keyword regexp out of the mapping to avoid duplication *)
 let keyword_re =
   Str.regexp
     (String.concat "\\|"
        (List.map (fun (s, _) -> Str.quote s) keywords))
-
 let number_re = Str.regexp "[0-9]+"
-
 let ident_re = Str.regexp "[a-zA-Z][a-zA-Z0-9]*"
-
-let space_re = Str.regexp "[ \t]+\\(//.*\\)+"
-
+let space_re = Str.regexp "[ \t]+\\|//.*"
 let newline_re = Str.regexp "\n"
 
 (* Read all the tokens from s, using pos to index into the string and line_n
-   to track the current line number, but error reporting later on. Return them
+   to track the current line number, for error reporting later on. Return them
    in a list. *)
 let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
   if pos >= String.length s then
@@ -127,7 +126,9 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
     let tok = Strmap.find (Str.matched_string s) keyword_map in
     (tok, line_n) :: lex s (Str.match_end ()) line_n
   else if Str.string_match ident_re s pos then
-    (Ident (Str.matched_string s), line_n) :: lex s (Str.match_end ()) line_n
+    (* Need the let because of OCaml's right-to-left evaluation *)
+    let id = Str.matched_string s in
+    (Ident id, line_n) :: lex s (Str.match_end ()) line_n
   else if Str.string_match number_re s pos then
     let num =
       try Int64.of_string (Str.matched_string s)

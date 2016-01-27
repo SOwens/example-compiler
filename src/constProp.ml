@@ -20,7 +20,9 @@
 
 open Util
 open SourceAst
+module T = Tokens
 
+(* Return n, such that 2^n = i, or None if there is no such *)
 let log2 (i : int64) : int option =
   (* Linear search for the least significant 1 in the binary represenatation.
      A binary search might be faster, but maybe not worth the hassle? *)
@@ -53,23 +55,24 @@ let rec might_have_effect (e : exp) : bool =
 
 (* Check whether two expressions are equal, and don't have effects. This lets
    some operators remove them. Note that we are just comparing the structure of
-   the expressions, so we won't see that x + (y + z) is equal to (x + y) + z *)
+   the expressions, so we won't see that x + (y + z) is equal to (x + y) + z,
+   etc. *)
 let ok_remove_eq_exp (e1 : exp) (e2 : exp) : bool =
   e1 = e2 &&
   not (might_have_effect e1) &&
   not (might_have_effect e2)
 
-let between_0_63 (i : int64) =
+let between_0_63 (i : int64) : bool =
   Int64.compare i (-1L) = 1 && Int64.compare i 64L = -1
 
 (* Statically evaluate an expression according to the identifier values in env,
-   don't try to follow constants in arrays.
-   We don't do anything with associativity or commutativity, so things like
+   don't try to follow constants in arrays. Operates in a single bottom-up pass.
+   Doesn't do anything with associativity or commutativity, so things like
    (x + 1) + 2 don't get changed. *)
-let rec fold_exp (env : exp Strmap.t) (e : exp) : exp =
+let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
   match e with
   | Ident (i, []) ->
-    (try Strmap.find i env
+    (try Idmap.find i env
      with Not_found -> e)
   | Ident (i, es) -> Ident (i, List.map (fold_exp env) es)
   | Num n -> Num n
@@ -122,9 +125,12 @@ let rec fold_exp (env : exp Strmap.t) (e : exp) : exp =
      | (e1, T.Eq, e2) when ok_remove_eq_exp e1 e2 -> Bool true
 
      (* Shift left *)
-     | (Num n1, T.Lshift, Num n2) when between_0_63 n2 ->
+     | (Num n1, T.Lshift, Num n2) ->
        (* Ocaml's shift_left is only defined between 0 and 63 inclusive *)
-       Num (Int64.shift_left n1 (Int64.to_int n2))
+       if between_0_63 n2 then
+         Num (Int64.shift_left n1 (Int64.to_int n2))
+       else
+         Num 0L
      | (e, T.Lshift, Num 0L) -> e
      | (Num 0L, T.Lshift, e) when not (might_have_effect e) ->
        Num 0L
@@ -177,7 +183,7 @@ let same_const (e1 : exp) (e2 : exp) : bool =
   | _ -> false
 
 (* If v1 and v2 contain the same constant, return it. Otherwise return None *)
-let merge_constants (id : id) (v1 : exp option) (v2 : exp option) 
+let merge_constants (id : id) (v1 : exp option) (v2 : exp option)
   : exp option =
   match (v1,v2) with
   | (Some e1, Some e2) ->
@@ -189,14 +195,14 @@ let merge_constants (id : id) (v1 : exp option) (v2 : exp option)
 (* Do constant propagation. Accumulate an environment of definitely known
    constants at the end of stmts, given definitely known constants env at the
    start. *)
-let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list)
-  : exp Strmap.t * stmt list =
+let rec prop_stmts (env : exp Idmap.t) (stmts : stmt list)
+  : exp Idmap.t * stmt list =
   match stmts with
   | [] -> (env,[])
   | Assign (x, [], e) :: stmts ->
     let o1 = fold_exp env e in
     let first_env =
-      if is_const o1 then Strmap.add x o1 env else Strmap.remove x env
+      if is_const o1 then Idmap.add x o1 env else Idmap.remove x env
     in
     let (env',stmts') = prop_stmts first_env stmts in
     (env', Assign (x, [], o1) :: stmts')
@@ -242,7 +248,7 @@ let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list)
        (* Only include constants that are known to be the same at the end of
           both branches of the Ite for the subsequent statements. *)
        let (env',stmts') =
-         prop_stmts (Strmap.merge merge_constants env1 env2) stmts
+         prop_stmts (Idmap.merge merge_constants env1 env2) stmts
        in
        (env', Ite (o1, os1, os2) :: stmts'))
   | Stmts (stmts1) :: stmts ->
@@ -250,7 +256,7 @@ let rec prop_stmts (env : exp Strmap.t) (stmts : stmt list)
     let (env', stmts') = prop_stmts env1 stmts in
     (env', Stmts (os1) :: stmts')
   | In x :: stmts ->
-    let (env',stmts') = prop_stmts (Strmap.remove x env) stmts in
+    let (env',stmts') = prop_stmts (Idmap.remove x env) stmts in
     (env', In x :: stmts')
   | Out x :: stmts ->
     let (env',stmts') = prop_stmts env stmts in
@@ -268,11 +274,11 @@ and prop_stmt env (stmt : stmt) =
 (* Given possibly known constants env at the start, compute the definitely
    known constants at the end, assuming that stmts is run in a loop body an
    unknown number of times. *)
-and prop_loop_body (env : exp Strmap.t) (stmts : stmt list) : exp Strmap.t =
+and prop_loop_body (env : exp Idmap.t) (stmts : stmt list) : exp Idmap.t =
   let (env', stmts') = prop_stmts env stmts in
   (* The next approximation of constants at the start *)
-  let env'' = Strmap.merge merge_constants env env' in
-  if Strmap.equal same_const env env'' then
+  let env'' = Idmap.merge merge_constants env env' in
+  if Idmap.equal same_const env env'' then
     (* Same as last time, fixed point reached *)
     env''
   else

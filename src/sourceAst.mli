@@ -16,7 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* The langauage's tokens, and a simple lexer *)
+(* The language's AST, and a predictive, recursive descent parser. See the
+   ../README.md for the grammar. *)
 
 type id =
   | Source of string
@@ -48,5 +49,7 @@ type stmt =
   | Out of id
   | Loc of stmt * int (* annotate a statement with it's source line number *)
   [@@deriving show]
+
+val pp_stmts : Format.formatter -> stmt list -> unit
 
 val parse_program : (Tokens.token * int) list -> stmt list
