@@ -71,8 +71,7 @@ let rec unnest (stmts : stmt list) : stmt list =
 
   (* Flatten out and expression into a list of statements and an expression by
      using temporary variables to store the results of each sub-expression. The
-     expression returned satisfies is_flat above, and the statement are
-     assignments of flat expressions to non-array identifiers.
+     expression returned satisfies is_flat above.
 
      Warning: As implemented, this is O(n^2) because of the list appending.
      This is unlikely to matter for human written code, as it is O(n^2) where n
@@ -86,8 +85,22 @@ let rec unnest (stmts : stmt list) : stmt list =
     | Bool b -> ([], Bool b)
     | Ident (i, []) -> ([], Ident (i, []))
     | Ident (i, es) -> raise Todo
-    | Op (e1, T.And, e2) -> raise Todo
-    | Op (e1, T.Or, e2) -> raise Todo
+    | Op (e1, T.And, e2) ->
+      let (s1, f1) = unnest_exp e1 in
+      let (s2, f2) = unnest_exp e2 in
+      (* f1 && f2 --> (if f1 then tmp := f2 else t := false); tmp *)
+      let tmp = get_ident () in
+      (s1 @ s2 @
+       [Ite (f1, Assign (tmp, [], f2), Assign (tmp, [], Bool false))],
+       (Ident (tmp, [])))
+    | Op (e1, T.Or, e2) ->
+      let (s1, f1) = unnest_exp e1 in
+      let (s2, f2) = unnest_exp e2 in
+      (* f1 || f2 --> (if f1 then tmp := true else tmp := f2 ); tmp *)
+      let tmp = get_ident () in
+      (s1 @ s2 @
+       [Ite (f1, Assign (tmp, [], Bool true), Assign (tmp, [], f2))],
+       (Ident (tmp, [])))
     | Op (e1, op, e2) ->
       let (s1, f1) = unnest_exp e1 in
       let (s2, f2) = unnest_exp e2 in
