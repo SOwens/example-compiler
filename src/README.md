@@ -19,12 +19,11 @@ The AST goes through a series of transformations
 - _constProp.ml_: Constant propagation and folding
   The compiler later relies on there being no operators with two constant
   operands.
-TODO: Check below here
 - _unnestExp.ml_: Un-nesting of expressions
   Flattens out expressions, using assignments to temporary variables. Ensures
   that no expressions contain sub-expressions with operators in them.
 - _blockStructure.ml_: Transforms then AST to a control-flow graph of basic
-  blocks. Requires expressions to be un-nested and booleans to be removed.
+  blocks. Requires expressions to be un-nested and && and || to be removed.
 
 Basic-block transformations
 ---------------------------
@@ -34,7 +33,6 @@ Basic-block transformations
   introducing assignments to temporary variables .
 - _liveVarAnalysis.ml_: Performs live variable analysis, and removes unused
   assignments.
-  (* TODO: Add check that operators are pure *)
 - _regAlloc.ml_: Perform register allocation. This changes all identifiers from
   named variables to registers and stack offsets.
 - _linearistCFG.ml_: Flatten the CFG, introducing labels and branches.

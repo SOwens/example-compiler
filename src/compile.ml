@@ -44,7 +44,8 @@ let _ =
        | None ->
          filename_ref := Some s
        | Some s' ->
-         (Format.printf "Error: given multiple files to process: %s and %s\n" s' s;
+         (Format.printf "Error: given multiple files to process: %s and %s\n"
+            s' s;
           exit 1))
     usage_msg
 
@@ -61,15 +62,8 @@ let ast = FrontEnd.front_end filename false;;
 let (_,opt_ast) = ConstProp.prop_stmts SourceAst.Idmap.empty ast;;
 (* printf "@\n%a@\n" SourceAst.pp_stmts opt_ast;; *)
 
-(*
-let no_bool_ast = RemoveBool.remove_and_or opt_ast;;
-print_newline ();;
-print_string ([%show: SourceAst.stmt list] no_bool_ast);;
-print_newline ();;
-   *)
-
 let no_nest_ast = UnnestExp.unnest opt_ast;;
-(* printf "@\n%a@\n" SourceAst.pp_stmts opt_ast;; *)
+(* printf "@\n%a@\n" SourceAst.pp_stmts no_nest_ast;; *)
 
 let cfg = BlockStructure.build_cfg no_nest_ast;;
 (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg;; *)
@@ -107,7 +101,8 @@ let lva_cfg3 = LiveVarAnalysis.remove_unused_writes lva_cfg2;;
 let lva_cfg4 = LiveVarAnalysis.lva (List.map fst lva_cfg3);;
 (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;; *)
 
-let (reg_cfg, num_stack) = RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst lva_cfg4);;
+let (reg_cfg, num_stack) =
+  RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst lva_cfg4);;
 (* printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg;; *)
 
 let linear = LineariseCfg.cfg_to_linear reg_cfg;;

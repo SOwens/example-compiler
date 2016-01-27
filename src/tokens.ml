@@ -21,6 +21,9 @@
 open Util
 
 (* Primitive operators *)
+(* When extending with impure operators, be careful to check the rest of the 
+   compiler where it depends on purity. Right now only Div is impure
+   (divide-by-zero) *)
 type op =
   | Plus
   | Minus

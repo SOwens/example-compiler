@@ -16,5 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Convert linearised three-address code to x86-64 *)
+
 val num_regs : int
 val to_x86 : bool -> LineariseCfg.linear list -> int -> X86.instruction list

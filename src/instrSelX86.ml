@@ -16,6 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Convert linearised three-address code to x86-64 *)
+
 open BlockStructure
 open X86
 module L = LineariseCfg
@@ -127,7 +129,8 @@ let caller_restore =
 let rec be_to_x86 (underscore_labels : bool) be =
   match be with
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
-    be_to_x86 underscore_labels (AssignOp (v, ae2, invert_op op, Num imm)) (* constant prop ensures both aren't immediate *)
+    (* constant prop ensures both aren't immediate *)
+    be_to_x86 underscore_labels (AssignOp (v, ae2, invert_op op, Num imm))
   | AssignOp (v, Ident v2, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     let cmp_instr =
       match ae2 with
@@ -153,7 +156,8 @@ let rec be_to_x86 (underscore_labels : bool) be =
        cmp_instr @
        [Zset (op_to_cond op, B r);
         Zbinop (Zand, Zrm_i (Zr r, 1L))])
-  | AssignOp (v, ae1, ((T.Plus | T.Minus | T.Lshift | T.BitOr | T.BitAnd | T.Times | T.Div) as op), ae2) ->
+  | AssignOp (v, ae1, ((T.Plus | T.Minus | T.Lshift | T.BitOr
+                       | T.BitAnd | T.Times | T.Div) as op), ae2) ->
     (match (var_to_rm v, ae1) with
      | (Zr r1, Num imm2) ->
        (* r1 := imm2 op m/r3 --> mov r1, imm2; op r1, m/r3 *)
@@ -162,12 +166,14 @@ let rec be_to_x86 (underscore_labels : bool) be =
        (* r1 := m/r2 op m/r3/imm3 --> mov r1, m/r2; op r1, m/r3/imm3 *)
        Zmov (Zr_rm (r1, var_to_rm var)) :: build_to_reg_op op r1 ae2
      | (Zm _ as m1, Num imm2) ->
-       (* m1 := imm2 op m/r3 --> mov r_scratch, imm2; op r_scratch, m/r3; mov m1, r_scratch *)
+       (* m1 := imm2 op m/r3 -->
+          mov r_scratch, imm2; op r_scratch, m/r3; mov m1, r_scratch *)
        Zmov (Zrm_i (Zr r_scratch, imm2)) ::
        build_to_reg_op op r_scratch ae2 @
        [Zmov (Zrm_r (m1, r_scratch))]
      | (Zm _ as m1, Ident var) ->
-       (* m1 := m/r2 op m/r3/imm3 --> mov r_scratch, m/r2; op r_scratch, m/r3/imm3; mov m1, r_scratch *)
+       (* m1 := m/r2 op m/r3/imm3 -->
+          mov r_scratch, m/r2; op r_scratch, m/r3/imm3; mov m1, r_scratch *)
        Zmov (Zr_rm (r_scratch, var_to_rm var)) ::
        build_to_reg_op op r_scratch ae2 @
        [Zmov (Zrm_r (m1, r_scratch))])
@@ -203,12 +209,36 @@ let rec be_to_x86 (underscore_labels : bool) be =
     raise Todo
 
 let test_to_x86 ae1 ae2 =
-  raise Todo
+  match (ae1, ae2) with
+  | (Ident i, Num imm) ->
+    Zbinop (Zcmp, Zrm_i (var_to_rm i, imm))
+  | (Num imm, Ident i ) ->
+    raise Todo
+  | (Ident i1, Ident i2) ->
+    raise Todo
+  | (Num _, Num _) ->
+    raise (Util.InternalError "2 immediates in insteSelX86")
+
+
 
 let op_to_cc b op =
-  raise Todo
+  match (b, op) with
+  | (true, Lt) ->
+    Z_L
+  | (false, Lt) ->
+    Z_NL
+  | (true, Gt) ->
+    Z_G
+  | (false, Gt) ->
+    Z_NG
+  | (true, Eq) ->
+    Z_E
+  | (false, Eq) ->
+    Z_NE
 
-let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int) : instruction list =
+
+let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int)
+  : instruction list =
   (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
   let num_stack =
     if num_stack mod 2 = 0 then

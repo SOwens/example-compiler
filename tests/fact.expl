@@ -2,7 +2,7 @@
   c:=1
   input x
   z := 1
-  while 0 < x {
+  while x > 0 {
     z := z * x
     x := x - c
   }

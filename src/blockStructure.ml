@@ -225,8 +225,6 @@ let flat_exp_to_test (e : S.exp) : test =
   | S.Array es ->
     raise (InternalError "array alloc test in blockStructure")
 
-
-
 (* Build the control-flow graph *)
 let build_cfg (stmts : S.stmt list) : cfg =
   (* A counter to get new indices for blocks *)
@@ -250,9 +248,9 @@ let build_cfg (stmts : S.stmt list) : cfg =
      ret_block is the control flow out of the block being created.
 
      The AST must be in a restricted form:
-     - The expressions must all be unnested 
+     - The expressions must all be unnested
        (i.e. UnnestExp.is_flat returns true).
-     - Booleans (and && || !) must have been removed.
+     - && and || must have been removed.
      - Array indexing must have been removed. *)
   let rec find_blocks (block_num : int) (block_acc : basic_block)
       (ret_block : next_block) (stmts : S.stmt list) : unit =

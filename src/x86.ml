@@ -16,10 +16,11 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* A fragment of x86-64 AST, and printing in NASM syntax *)
+(* Translated from HOL4 in examples/machine-code/instruction-set-models/x86_64 *)
+
 open Format
 open Util
-
-(* Translated from HOL4 in examples/machine-code/instruction-set-models/x86_64 *)
 
 (* 64-bit registers *)
 type reg =
@@ -122,7 +123,9 @@ let pp_imm_rm fmt ir =
   | Zi_rm rm -> pp_rm fmt rm
   | Zi i -> fprintf fmt "%Ld" i
 
-type binop_name = Zadc | Zadd | Zand | Zcmp | Zor | Zshl | Zshr | Zsar | Zsub | Zsbb | Ztest | Zxor
+type binop_name =
+  | Zadc | Zadd | Zand | Zcmp | Zor | Zshl | Zshr
+  | Zsar | Zsub | Zsbb | Ztest | Zxor
 
 let show_binop_name b =
   match b with
@@ -189,7 +192,8 @@ type instruction =
   | Zxadd      of rm * reg
   | Zxchg      of rm * reg
    *)
-  | Zimul      of reg * rm * int64 option (* either reg := reg * rm; or reg := rm * int *)
+  (* either reg := reg * rm; or reg := rm * int *)
+  | Zimul      of reg * rm * int64 option
   | Zidiv      of rm (* RAX := RDX,RAX / rm; RDX := RDX,RAX mod rm *)
   | Zlea       of dest_src
   | Zpop       of rm
@@ -199,12 +203,12 @@ type instruction =
   | Zcpuid
   | Zmov       of dest_src
   (* | Zmovzx     of dest_src *)
-  | Zjcc       of cond * string     (* jcc includes jmp rel, i.e. unconditional relative jumps. *)
+  (* jcc includes jmp rel, i.e. unconditional relative jumps. *)
+  | Zjcc       of cond * string
   | Zjmp       of rm                (* jmp excludes relative jumps, see jcc. *)
   | Zset       of cond * byte_reg   (* Set operates on a byte of memory or
                                        register. Here, we'll only use registers
                                     *)
-  (* | Zloop      of cond * int64    (* Here Zcond over approximates possibilities. *) *)
 
 let pp_instruction fmt i =
   match i with

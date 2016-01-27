@@ -23,21 +23,29 @@
 open BlockStructure
 exception Todo
 
-(* Build a series of assignments that puts the immediate n into the dest register, using
-   only immediates of 32 bits or smaller *)
+(* Build a series of assignments that puts the immediate n into the dest
+   register, using only immediates of 32 bits or smaller *)
 let assign_imm (dest : var) (n : int64) : block_elem list =
   [AssignAtom (dest, Num (Int64.shift_right_logical n 32));
    AssignOp (dest, Ident dest, Tokens.Lshift, Num 32L);
-   AssignOp (dest, Ident dest, Tokens.BitOr, Num (Int64.logand n 0x00000000FFFFFFFFL))]
+   AssignOp (dest, Ident dest, Tokens.BitOr,
+             Num (Int64.logand n 0x00000000FFFFFFFFL))]
 
 let is_imm (a : atomic_exp) : bool =
   match a with
   | Ident _ -> false
   | Num _ -> true
 
+(* If the atomic_exp is a large immediate constant (takes more thatn 32 bits),
+   then return the int64, else None. Relies on int64 being 2s complement. It
+   it's negative (the top bit is 1), then check that the top 33 bits are 1. It
+   it's non-negative, check that the top 33 bits are 0. 32 won't suffice,
+   because when we truncate to 32 bits only, the top bit needs to be the sign
+   bit. *)
 let get_large_imm (a : atomic_exp) : int64 option =
   match a with
   | Num n ->
+    (* This is an arithmetic shift. *)
     let topmost = Int64.shift_right n 31 in
     if Int64.compare topmost 0L = 0 ||
        Int64.compare topmost 0xFFFFFFFFFFFFFFFFL = 0 then
@@ -81,5 +89,8 @@ let shrink_imm_elem (tmp_reg : var) (e : block_elem) : block_elem list =
 let shrink_imm (cfg : cfg) : cfg =
   List.map
     (fun cfg_entry ->
-       { cfg_entry with elems = List.flatten (List.map (shrink_imm_elem (NamedTmp 0)) cfg_entry.elems) })
+       { cfg_entry with
+         elems =
+           List.flatten
+             (List.map (shrink_imm_elem (NamedTmp 0)) cfg_entry.elems) })
     cfg

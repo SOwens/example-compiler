@@ -16,6 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Flatten the CFG into a list of three-address code. *)
+
 open BlockStructure
 type linear =
   | Instr of block_elem

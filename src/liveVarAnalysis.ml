@@ -21,10 +21,10 @@ open BlockStructure
 exception Todo
 
 type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }
-    [@@deriving show]
+  [@@deriving show]
 
 type cfg = (cfg_entry * cfg_annot) list
-    [@@deriving show]
+  [@@deriving show]
 
 (* Add the assigned identifier in a to the generation set *)
 let add_gen (a : atomic_exp) (gen : Varset.t) : Varset.t =
@@ -56,7 +56,8 @@ let analyse_block (b : basic_block) : cfg_annot =
   let (gen,kill) = analyse_block Varset.empty Varset.empty (List.rev b) in
   { gen = gen; kill = kill; live_exit = Varset.empty }
 
-(* Split the annotated cfg into the predecessors of node n, and the other nodes *)
+(* Split the annotated cfg into the predecessors of node n, and the other nodes
+*)
 let rec find_preds n cfg =
   List.partition
     (fun (entry, annots) ->
@@ -80,9 +81,13 @@ let lva (cfg : BlockStructure.cfg) : cfg =
     match worklist with
     | [] -> finished_list
     | ((entry, annot) as node) :: worklist ->
-      let live_entry = Varset.union annot.gen (Varset.diff annot.live_exit annot.kill) in
+      let live_entry =
+        Varset.union annot.gen (Varset.diff annot.live_exit annot.kill)
+      in
       let (updates, worklist) = find_preds entry.bnum worklist in
-      let (possible_updates, finished) = find_preds entry.bnum (node::finished_list) in
+      let (possible_updates, finished) =
+        find_preds entry.bnum (node::finished_list)
+      in
       let (finished', updates') =
         List.partition
           (fun (entry, annot) -> Varset.subset live_entry annot.live_exit)
@@ -91,7 +96,8 @@ let lva (cfg : BlockStructure.cfg) : cfg =
       let new_worklist =
         List.map
           (fun (entry, annot) ->
-             (entry, { annot with live_exit = Varset.union annot.live_exit live_entry}))
+             (entry, { annot with
+                       live_exit = Varset.union annot.live_exit live_entry}))
           (updates @ updates')
         @
         worklist
@@ -100,13 +106,21 @@ let lva (cfg : BlockStructure.cfg) : cfg =
   in
   do_one (List.rev init_worklist) []
 
-let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list) : block_elem list =
+(* Check that the operator cannot have a side-effect *)
+let pure_op op : bool =
+  match op with
+  | Tokens.Div -> false (* divide by zero *)
+  | _ -> true
+
+let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
+  : block_elem list =
   match elems with
   | [] -> []
   | AssignOp (i, a1, op, a2) :: b ->
-    if Varset.mem i live then
+    if Varset.mem i live && pure_op op then
       AssignOp (i, a1, op, a2) ::
-      local_remove_unused_writes (add_gen a1 (add_gen a2 (Varset.remove i live))) b
+      local_remove_unused_writes
+        (add_gen a1 (add_gen a2 (Varset.remove i live))) b
     else
       local_remove_unused_writes live b
   | AssignAtom (i, a) :: b ->
@@ -150,6 +164,9 @@ let add_exit_var (nb : next_block) (vars : Varset.t) : Varset.t =
 let remove_unused_writes (cfg : cfg) : cfg =
   List.map
     (fun (entry, annot) ->
-       let new_elems = local_remove_unused_writes (add_exit_var entry.next annot.live_exit) (List.rev entry.elems) in
+       let new_elems =
+         local_remove_unused_writes
+           (add_exit_var entry.next annot.live_exit) (List.rev entry.elems)
+       in
        ({entry with elems = List.rev new_elems}, annot))
     cfg

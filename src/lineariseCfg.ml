@@ -16,11 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* Flatten the CFG into a list of three-address code. *)
+
 open BlockStructure
 
 type linear =
   | Instr of block_elem
-  | CJump of test * bool * string (* jump to string if var is bool *)
+  | CJump of test * bool * string (* jump to string if the test is bool *)
   | Jump of string
   | Label of string
   [@@deriving show]
@@ -49,7 +51,8 @@ let rec pp_linear_list fmt ls =
     (pp_linear fmt x;
      pp_linear_list fmt y)
 
-module I = Map.Make(struct type t = int let (compare : int -> int -> int) = compare end)
+module I =
+  Map.Make(struct type t = int let (compare : int -> int -> int) = compare end)
 
 (* Initialise the mutable visited fields to false, and put CFG into a map *)
 let init_traversal (cfg : cfg) : cfg_entry I.t =
@@ -59,7 +62,7 @@ let init_traversal (cfg : cfg) : cfg_entry I.t =
 
 (* Linearise the reachable cfg, starting from the block with index next_block,
    but don't do already visited blocks *)
-(* This is essentially a DFS, pre-order traversal *)
+(* This is essentially a depth-first search, pre-order traversal *)
 let rec cfg_to_linear (next_block : int) (cfg : cfg_entry I.t) : linear list =
   let b = I.find next_block cfg in
   if b.finished then
@@ -77,7 +80,8 @@ let rec cfg_to_linear (next_block : int) (cfg : cfg_entry I.t) : linear list =
          (* We've started the next block, so we'll just jump to it *)
          [Jump ("block" ^ string_of_int i)]
        else
-         (* We haven't started the next block, so we can put it here and omit the jump *)
+         (* We haven't started the next block, so we can put it here and omit
+            the jump *)
          ((I.find i cfg).started <- true;
           cfg_to_linear i cfg)
      | Branch (v, t1, t2) ->
