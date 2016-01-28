@@ -54,7 +54,7 @@ let reg_numbers =
    (10, R14);
    (11, R15)]
 
-let var_to_rm v =
+let var_to_rm v : rm =
   match v with
   | Vreg i -> Zr (List.assoc i reg_numbers)
   | Stack i -> Zm (None, Some RBP, Some (Int64.of_int (-8 * (i+1))))
@@ -126,7 +126,7 @@ let caller_restore =
    Zpop (Zr RDX);
    Zpop (Zr RCX)]
 
-let rec be_to_x86 (underscore_labels : bool) be =
+let rec be_to_x86 (underscore_labels : bool) be : instruction list =
   match be with
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     (* constant prop ensures both aren't immediate *)
@@ -216,7 +216,15 @@ let test_to_x86 ae1 ae2 : instruction * bool =
   | (Num imm, Ident i) ->
     (Zbinop (Zcmp, Zrm_i (var_to_rm i, imm)), true)
   | (Ident i1, Ident i2) ->
-    raise Todo
+    (match (var_to_rm i1, var_to_rm i2) with
+     | (Zr r1, Zr r2) ->
+       (Zbinop (Zcmp, Zrm_r (Zr r1, r2)), false)
+     | (Zm _ as m, Zr r) ->
+       (Zbinop (Zcmp, Zrm_r (m, r)), false)
+     | (Zr r, (Zm _ as m)) ->
+       (Zbinop (Zcmp, Zr_rm (r, m)), false)
+     | (Zm _, Zm _) ->
+       raise Todo)
   | (Num _, Num _) ->
     raise (Util.InternalError "2 immediates in insteSelX86")
 
