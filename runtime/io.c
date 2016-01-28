@@ -17,6 +17,7 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 long input() {
   long i;
@@ -30,3 +31,7 @@ void output(long i) {
   printf("%ld\n", i);
   return;
 }
+
+long* array(long i) {
+  return malloc(i * sizeof(long));
+};

@@ -37,8 +37,6 @@ open Util
 open SourceAst
 module T = Tokens
 
-exception Todo
-
 let is_atomic (e : exp) : bool =
   match e with
   | Num _ -> true
@@ -84,50 +82,50 @@ let rec unnest (stmts : stmt list) : stmt list =
     | Num i -> ([], Num i)
     | Bool b -> ([], Bool b)
     | Ident (i, []) -> ([], Ident (i, []))
-    | Ident (i, es) -> raise Todo
+    | Ident (i, es) ->
+      let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
+      (List.flatten s_list, Ident (i, aes))
     | Op (e1, T.And, e2) ->
       let (s1, f1) = unnest_exp e1 in
       let (s2, f2) = unnest_exp e2 in
       (* f1 && f2 --> (if f1 then tmp := f2 else t := false); tmp *)
       let tmp = get_ident () in
-      (s1 @ s2 @
-       [Ite (f1, Assign (tmp, [], f2), Assign (tmp, [], Bool false))],
+      (s1 @
+       [Ite (f1,
+             Stmts (s2 @ [Assign (tmp, [], f2)]),
+             Assign (tmp, [], Bool false))],
        (Ident (tmp, [])))
     | Op (e1, T.Or, e2) ->
       let (s1, f1) = unnest_exp e1 in
       let (s2, f2) = unnest_exp e2 in
       (* f1 || f2 --> (if f1 then tmp := true else tmp := f2 ); tmp *)
       let tmp = get_ident () in
-      (s1 @ s2 @
-       [Ite (f1, Assign (tmp, [], Bool true), Assign (tmp, [], f2))],
+      (s1 @
+       [Ite (f1,
+             Assign (tmp, [], Bool true),
+             Stmts (s2 @ [Assign (tmp, [], f2)]))],
        (Ident (tmp, [])))
     | Op (e1, op, e2) ->
-      let (s1, f1) = unnest_exp e1 in
-      let (s2, f2) = unnest_exp e2 in
-      if is_atomic f1 && is_atomic f2 then
-        (s1 @ s2, Op (f1, op, f2))
-      else if is_atomic f1 then
-        let id2 = get_ident () in
-        (s1 @ s2 @ [Assign (id2, [], f2)],
-         Op (f1, op, Ident (id2, [])))
-      else if is_atomic f2 then
-        let id1 = get_ident () in
-        (s1 @ s2 @ [Assign (id1, [], f1)],
-         Op (Ident (id1, []), op, f2))
-      else
-        let id1 = get_ident () in
-        let id2 = get_ident () in
-        (s1 @ s2 @ [Assign (id1, [], f1); Assign (id2, [], f2)],
-         Op (Ident (id1, []), op, Ident (id2, [])))
+      let (s1, a1) = unnest_exp_atomic e1 in
+      let (s2, a2) = unnest_exp_atomic e2 in
+      (s1 @ s2, Op (a1, op, a2))
     | Uop (uop, e) ->
-      let (s, f) = unnest_exp e in
-      if is_atomic f then
-        (s, Uop (uop, f))
-      else
-        let id = get_ident () in
-        (s @ [Assign (id, [], f)], Uop (uop, f))
+      let (s, a) = unnest_exp_atomic e in
+      (s, Uop (uop, a))
     | Array es ->
-      raise Todo
+      let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
+      (List.flatten s_list, Array aes)
+
+(* Similar to unnest_exp, but ensures that the returned exp is atomic, rather
+   than just flat.  *)
+  and unnest_exp_atomic (e : exp) : stmt list * exp =
+    let (s, f) = unnest_exp e in
+    if is_atomic f then
+      (s, f)
+    else
+      let id = get_ident () in
+      (s @ [Assign (id, [], f)], Ident (id, []))
+
   in
 
   let stmts_to_stmt (s : stmt list) : stmt =
@@ -142,7 +140,9 @@ let rec unnest (stmts : stmt list) : stmt list =
       let (s', f) = unnest_exp e in
         s' @ [Assign (x, [], f)]
     | Assign (x, es, e) ->
-      raise Todo
+      let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
+      let (s, f) = unnest_exp e in
+      List.flatten s_list @ s @ [Assign (x, aes, f)]
     | DoWhile (s0, e, s1) ->
       let s0' = unnest_stmt s0 in
       let (se1, e') = unnest_exp e in
