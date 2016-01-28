@@ -90,7 +90,7 @@ let build_to_reg_op op r ae =
 (* Assume that we have kept RAX free for scratch space *)
 let r_scratch = RAX
 
-let invert_op op =
+let reverse_op op =
   match op with
   | T.Gt -> T.Lt
   | T.Lt -> T.Gt
@@ -130,7 +130,7 @@ let rec be_to_x86 (underscore_labels : bool) be =
   match be with
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     (* constant prop ensures both aren't immediate *)
-    be_to_x86 underscore_labels (AssignOp (v, ae2, invert_op op, Num imm))
+    be_to_x86 underscore_labels (AssignOp (v, ae2, reverse_op op, Num imm))
   | AssignOp (v, Ident v2, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     let cmp_instr =
       match ae2 with
@@ -208,18 +208,17 @@ let rec be_to_x86 (underscore_labels : bool) be =
   | Alloc _ ->
     raise Todo
 
-let test_to_x86 ae1 ae2 =
+(* Return a boolean true if the condition needs to be negated *)
+let test_to_x86 ae1 ae2 : instruction * bool =
   match (ae1, ae2) with
   | (Ident i, Num imm) ->
-    Zbinop (Zcmp, Zrm_i (var_to_rm i, imm))
-  | (Num imm, Ident i ) ->
-    raise Todo
+    (Zbinop (Zcmp, Zrm_i (var_to_rm i, imm)), false)
+  | (Num imm, Ident i) ->
+    (Zbinop (Zcmp, Zrm_i (var_to_rm i, imm)), true)
   | (Ident i1, Ident i2) ->
     raise Todo
   | (Num _, Num _) ->
     raise (Util.InternalError "2 immediates in insteSelX86")
-
-
 
 let op_to_cc b op =
   match (b, op) with
@@ -236,6 +235,11 @@ let op_to_cc b op =
   | (false, Eq) ->
     Z_NE
 
+let reverse_op2 op =
+  match op with
+  | Gt -> Lt
+  | Lt -> Gt
+  | Eq -> Eq
 
 let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int)
   : instruction list =
@@ -255,8 +259,9 @@ let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int)
           match l with
           | L.Instr be -> be_to_x86 underscore_labels be
           | L.CJump ((ae1, op, ae2), b, s) ->
-            [test_to_x86 ae1 ae2;
-             Zjcc (op_to_cc b op, s)]
+            let (cmp, reverse) = test_to_x86 ae1 ae2 in
+            [cmp;
+             Zjcc (op_to_cc b (if reverse then reverse_op2 op else op), s)]
           | L.Jump s ->
             [Zjcc (Z_ALWAYS, s)]
           | L.Label s ->
