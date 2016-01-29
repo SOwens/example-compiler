@@ -46,12 +46,12 @@ module M : VarNumMonad = struct
   let return x map = (map, x)
 
   (* bind is defined as a standard state monad *)
-  let bind x f map = 
+  let bind x f map =
     let (new_map, res) = x map in
     f res new_map
 
   let inc_var v map =
-    try 
+    try
       let i = Varmap.find v map in
       (Varmap.add v (i + 1) map, ())
     with
@@ -61,35 +61,35 @@ module M : VarNumMonad = struct
   let get_counts map = (map, map)
 
   let run f =
-    let (_, x) = f Varmap.empty in 
+    let (_, x) = f Varmap.empty in
     x
-end 
+end
 
-let sequence (l : 'a M.t list) : 'a list M.t = 
-  let mcons p q = 
+let sequence (l : 'a M.t list) : 'a list M.t =
+  let mcons p q =
     M.do_ ;
     x <-- p;
     y <-- q;
     return (x::y) in
   List.fold_right mcons l (M.return [])
 
-let mapM (f : 'a -> 'b M.t) (al : 'a list) : 'b list M.t = 
+let mapM (f : 'a -> 'b M.t) (al : 'a list) : 'b list M.t =
   sequence (List.map f al)
 
-let sequence_ (l : unit M.t list) : unit M.t = 
-  let mcons p q = 
+let sequence_ (l : unit M.t list) : unit M.t =
+  let mcons p q =
     M.do_ ;
     x <-- p;
     y <-- q;
     return () in
   List.fold_right mcons l (M.return ())
 
-let mapM_ (f : 'a -> unit M.t) (al : 'a list) : unit M.t = 
+let mapM_ (f : 'a -> unit M.t) (al : 'a list) : unit M.t =
   sequence_ (List.map f al)
 
 let count_vars_ae (ae : atomic_exp) : unit M.t =
   match ae with
-  | Ident r -> 
+  | Ident r ->
     M.do_ ;
     () <-- M.inc_var r;
     return ()
@@ -200,7 +200,7 @@ let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
 let reg_alloc (num_regs : int) (cfg : cfg) : (cfg * int) =
   let counts = count_vars cfg in
   let counts_list = Varmap.bindings counts in
-  let sorted_counts_list = 
+  let sorted_counts_list =
     List.map fst (List.sort (fun (_, x) (_, y) -> compare y x) counts_list)
   in
   let num_regs = min num_regs (List.length sorted_counts_list) in
@@ -211,8 +211,8 @@ let reg_alloc (num_regs : int) (cfg : cfg) : (cfg * int) =
   let alloc_list = zip in_regs reg_nums @ zip on_stack stack_nums in
   let map = List.fold_right (fun (k,v) m -> Varmap.add k v m) alloc_list Varmap.empty in
   let cfg =
-    List.map (fun entry -> { bnum = entry.bnum; 
-                             elems = List.map (reg_alloc_be map) entry.elems; 
+    List.map (fun entry -> { bnum = entry.bnum;
+                             elems = List.map (reg_alloc_be map) entry.elems;
                              next = reg_alloc_nb map entry.next;
                              finished = false;
                              started = false }) cfg in

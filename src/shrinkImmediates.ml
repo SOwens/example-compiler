@@ -21,6 +21,7 @@
    arguments, and we maintain that property here. *)
 
 open BlockStructure
+
 exception Todo
 
 (* Build a series of assignments that puts the immediate n into the dest
