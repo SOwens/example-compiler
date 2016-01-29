@@ -172,14 +172,16 @@ let id_to_var (i : S.id) : var =
   | S.Source s -> NamedSource s
   | S.Temp i -> NamedTmp i
 
+let bool_to_num b = 
+  if b then Num 1L else Num 0L
+
 let exp_to_atomic (e : S.exp) : atomic_exp =
   match e with
   | S.Ident (id, []) -> Ident (id_to_var id)
   | S.Ident (id, _) ->
     raise (InternalError "array index in blockStructure")
   | S.Num n -> Num n
-  | S.Bool _ ->
-    raise (InternalError "bool in blockStructure")
+  | S.Bool b -> bool_to_num b
   | S.Op _ | S.Uop _ | S.Array _ ->
     raise (InternalError "non-flat expression in blockStructure")
 
@@ -192,8 +194,7 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem =
     raise (InternalError "array index in blockStructure")
   | S.Num n ->
     AssignAtom (v, Num n)
-  | S.Bool _ ->
-    raise (InternalError "bool in blockStructure")
+  | S.Bool b -> AssignAtom (v, bool_to_num b)
   | S.Op (ae1, op, ae2) ->
     AssignOp (v, exp_to_atomic ae1, op, exp_to_atomic ae2)
   | S.Uop (Tokens.Not, ae) ->
@@ -211,13 +212,13 @@ let op_to_test_op op =
 let flat_exp_to_test (e : S.exp) : test =
   match e with
   | S.Ident (id, []) ->
-    (Num 1L, Eq, Ident (id_to_var id))
+    (Ident (id_to_var id), Eq, Num 1L)
   | S.Ident (id, _) ->
     raise (InternalError "array index in blockStructure")
   | S.Num n ->
-    raise (InternalError "constant in test position in blockStructure")
-  | S.Bool _ ->
-    raise (InternalError "bool in blockStructure")
+    raise (InternalError "number in test position in blockStructure")
+  | S.Bool b ->
+    (bool_to_num b, Eq, Num 1L)
   | S.Op (ae1, op, ae2) ->
     (exp_to_atomic ae1, op_to_test_op op, exp_to_atomic ae2)
   | S.Uop (Tokens.Not, ae) ->
