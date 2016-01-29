@@ -17,7 +17,7 @@
 *)
 
 (* A control flow graph representation with basic blocks, and the source AST ->
-   CGF algorithm *)
+   CGF algorithm. Also compiles arrays to loads and stores. *)
 
 type var =
   | Vreg of int

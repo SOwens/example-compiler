@@ -21,9 +21,11 @@ The AST goes through a series of transformations
   operands.
 - _unnestExp.ml_: Un-nesting of expressions
   Flattens out expressions, using assignments to temporary variables. Ensures
-  that no expressions contain sub-expressions with operators in them.
+  that no expressions contain sub-expressions with operators in them. Also
+  makes all array accesses single-dimensional.
 - _blockStructure.ml_: Transforms then AST to a control-flow graph of basic
   blocks. Requires expressions to be un-nested and && and || to be removed.
+  Inserts array bounds checks.
 
 Basic-block transformations
 ---------------------------

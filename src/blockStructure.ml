@@ -17,7 +17,7 @@
 *)
 
 (* A control flow graph representation with basic blocks, and the source AST ->
-   CGF algorithm *)
+   CGF algorithm. Also compiles arrays to loads and stores. *)
 
 open Util
 module S = SourceAst
@@ -182,29 +182,43 @@ let bool_to_num b =
 let exp_to_atomic (e : S.exp) : atomic_exp =
   match e with
   | S.Ident (id, []) -> Ident (id_to_var id)
-  | S.Ident (id, _) ->
-    raise (InternalError "array index in blockStructure")
   | S.Num n -> Num n
   | S.Bool b -> bool_to_num b
-  | S.Op _ | S.Uop _ | S.Array _ ->
+  | S.Ident (_, _::_) | S.Op _ | S.Uop _ | S.Array _ ->
     raise (InternalError "non-flat expression in blockStructure")
 
-let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem =
+let tmp_var = NamedTmp("BS", 0)
+
+let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
   let v = id_to_var x in
   match e with
   | S.Ident (id, []) ->
-    AssignAtom (v, Ident (id_to_var id))
-  | S.Ident (id, _) ->
-    raise (InternalError "array index in blockStructure")
-  | S.Num n ->
-    AssignAtom (v, Num n)
-  | S.Bool b -> AssignAtom (v, bool_to_num b)
+    [AssignAtom (v, Ident (id_to_var id))]
+  | S.Ident (id, [ae]) ->
+    let ae = exp_to_atomic ae in
+    (* v := id[ae] --> tmp_var := *id;
+                       assert ae < length_var;
+                       v := *(id + (ae+1) * 8) *)
+    let get_len = Ld (tmp_var, id_to_var id, Num 0L) in
+    (* TODO assert ae < tmp_var *)
+    (match ae with
+     | Num n ->
+       [get_len; Ld (v, id_to_var id, Num (Int64.shift_left (Int64.add n 1L) 3))]
+     | _ ->
+       [get_len;
+        AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+        AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
+        Ld (v, id_to_var id, Ident tmp_var)])
+  | S.Ident (id, _::_::_) ->
+    raise (InternalError "multi-dimension array index in blockStructure")
+  | S.Num n -> [AssignAtom (v, Num n)]
+  | S.Bool b -> [AssignAtom (v, bool_to_num b)]
   | S.Op (ae1, op, ae2) ->
-    AssignOp (v, exp_to_atomic ae1, op, exp_to_atomic ae2)
+    [AssignOp (v, exp_to_atomic ae1, op, exp_to_atomic ae2)]
   | S.Uop (Tokens.Not, ae) ->
     raise (InternalError "not in blockStructure")
   | S.Array es ->
-    Alloc (List.map exp_to_atomic es)
+    [Alloc (List.map exp_to_atomic es)]
 
 let op_to_test_op op =
   match op with
@@ -217,8 +231,8 @@ let flat_exp_to_test (e : S.exp) : test =
   match e with
   | S.Ident (id, []) ->
     (Ident (id_to_var id), Eq, Num 1L)
-  | S.Ident (id, _) ->
-    raise (InternalError "array index in blockStructure")
+  | S.Ident (id, _::_) ->
+    raise (InternalError "array index in test position in blockStructure")
   | S.Num n ->
     raise (InternalError "number in test position in blockStructure")
   | S.Bool b ->
@@ -256,16 +270,35 @@ let build_cfg (stmts : S.stmt list) : cfg =
      - The expressions must all be unnested
        (i.e. UnnestExp.is_flat returns true).
      - && and || must have been removed.
-     - Array indexing must have been removed. *)
+     - Multi-dimensional array indexing must have been removed. *)
   let rec find_blocks (block_num : int) (block_acc : basic_block)
       (ret_block : next_block) (stmts : S.stmt list) : unit =
     match stmts with
     | [] ->
       add_block block_num block_acc ret_block
     | S.Assign (x, [], e) :: s1 ->
-      find_blocks block_num (flat_e_to_assign x e :: block_acc) ret_block s1
-    | S.Assign (x, es, e) :: s1 ->
-      raise (InternalError "Array index in blockStructure")
+      find_blocks block_num (flat_e_to_assign x e @ block_acc) ret_block s1
+    | S.Assign (x, [ae], e) :: s1 ->
+      let ae = exp_to_atomic ae in
+      (* x[ae] := e --> tmp_var := *x;
+                        assert ae < length_var;
+                        *(x + (ae+1) * 8) := e *)
+      let get_len = Ld (tmp_var, id_to_var x, Num 0L) in
+      (* TODO assert ae < tmp_var *)
+      let new_block_elems =
+        (match ae with
+         | Num n ->
+           [get_len;
+            St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3), ae)]
+         | _ ->
+           [get_len;
+            AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+            AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
+            St (id_to_var x, Ident tmp_var, ae)])
+      in
+      find_blocks block_num (new_block_elems @ block_acc) ret_block s1
+    | S.Assign (x, _::_::_, e) :: s1 ->
+      raise (InternalError "multi-dimension array index in blockStructure")
     | S.Stmts s1 :: s2 ->
       (* Treat { s1 ... sn } s1' ... sn' as though it were
          s1 ... sn s1' ... sn' *)

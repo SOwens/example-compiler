@@ -140,12 +140,13 @@ let rec unnest (stmts : stmt list) : stmt list =
       let id = get_ident () in
       (s @ [Assign (id, [], f)], Ident (id, []))
 
-  in
-
-  let stmts_to_stmt (s : stmt list) : stmt =
-    match s with
-    | [s1] -> s1
-    | _ -> Stmts s
+  and unnest_exp_for_test (e : exp) : stmt list * exp =
+    let (s, f) = unnest_exp e in
+    match f with
+    | Ident (x, [f']) ->
+      let id = get_ident () in
+      (s @ [Assign (id, [], f)], Ident (id, []))
+    | _ -> (s, f)
   in
 
   let rec unnest_stmt (s : stmt) : stmt list =
@@ -161,11 +162,11 @@ let rec unnest (stmts : stmt list) : stmt list =
        | _ -> assert false)
     | DoWhile (s0, e, s1) ->
       let s0' = unnest_stmt s0 in
-      let (se1, e') = unnest_exp e in
+      let (se1, e') = unnest_exp_for_test e in
       let s1' = unnest_stmt s1 in
       [DoWhile (stmts_to_stmt (s0' @ se1), e', stmts_to_stmt s1')]
     | Ite (e, s1, s2) ->
-      let (se, e') = unnest_exp e in
+      let (se, e') = unnest_exp_for_test e in
       let s1' = unnest_stmt s1 in
       let s2' = unnest_stmt s2 in
       se @ [Ite (e', stmts_to_stmt s1', stmts_to_stmt s2')]

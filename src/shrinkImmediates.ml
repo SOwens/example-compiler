@@ -24,6 +24,9 @@ open BlockStructure
 
 exception Todo
 
+let tmp_var = NamedTmp ("SI",0)
+let tmp_var2 = NamedTmp ("SI",1)
+
 (* Build a series of assignments that puts the immediate n into the dest
    register, using only immediates of 32 bits or smaller *)
 let assign_imm (dest : var) (n : int64) : block_elem list =
@@ -55,21 +58,21 @@ let get_large_imm (a : atomic_exp) : int64 option =
       Some n
   | _ -> None
 
-let shrink_imm_elem (tmp_reg : var) (e : block_elem) : block_elem list =
+let shrink_imm_elem (e : block_elem) : block_elem list =
   match e with
   | AssignOp (dest, a1, op, a2) ->
     assert (not (is_imm a1 && is_imm a2));
     begin
       match get_large_imm a1 with
       | Some n ->
-        assign_imm tmp_reg n @
-        [AssignOp (dest, Ident tmp_reg, op, a2)]
+        assign_imm tmp_var n @
+        [AssignOp (dest, Ident tmp_var, op, a2)]
       | None ->
         begin
           match get_large_imm a2 with
           | Some n ->
-            assign_imm tmp_reg n @
-            [AssignOp (dest, a1, op, Ident tmp_reg)]
+            assign_imm tmp_var n @
+            [AssignOp (dest, a1, op, Ident tmp_var)]
           | None ->
             [e]
         end
@@ -80,10 +83,26 @@ let shrink_imm_elem (tmp_reg : var) (e : block_elem) : block_elem list =
       | Some n -> assign_imm dest n
       | None -> [e]
     end
-  | Ld (v1, v2, addr) ->
-    raise Todo
+  | Ld (v1, v2, a) ->
+    begin
+      match get_large_imm a with
+      | Some n ->
+        assign_imm tmp_var n @ [Ld(v1, v2, Ident tmp_var)]
+      | None -> [e]
+    end
   | St (r, a1, a2) ->
-    raise Todo
+    begin
+      match (get_large_imm a1, get_large_imm a2) with
+      | (None, None) -> [e]
+      | (Some n1, None) ->
+        assign_imm tmp_var n1 @ [St(r, Ident tmp_var, a2)]
+      | (None, Some n2) ->
+        assign_imm tmp_var n2 @ [St(r, a1, Ident tmp_var)]
+      | (Some n1, Some n2) ->
+        assign_imm tmp_var n1 @
+        assign_imm tmp_var2 n2 @
+        [St(r, Ident tmp_var, Ident tmp_var2)]
+    end
   | In r -> [e]
   | Out r -> [e]
   | Alloc _ ->
@@ -95,5 +114,5 @@ let shrink_imm (cfg : cfg) : cfg =
        { cfg_entry with
          elems =
            List.flatten
-             (List.map (shrink_imm_elem (NamedTmp ("SI", 0))) cfg_entry.elems) })
+             (List.map shrink_imm_elem cfg_entry.elems) })
     cfg
