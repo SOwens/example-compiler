@@ -43,10 +43,10 @@ let analyse_block (b : basic_block) : cfg_annot =
         b
     | AssignAtom (i, a) :: b ->
       analyse_block (add_gen a (Varset.remove i gen)) (Varset.add i kill) b
-    | Ld (i, addr) :: b ->
-      analyse_block (Varset.remove i gen) (Varset.add i kill) b
-    | St (i, addr) :: b ->
-      analyse_block (Varset.add i gen) kill b
+    | Ld (i, j, addr) :: b ->
+      raise Todo
+    | St (i, a1, s2) :: b ->
+      raise Todo
     | In i :: b ->
       analyse_block (Varset.remove i gen) (Varset.add i kill) b
     | Out i :: b ->
@@ -129,14 +129,16 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
       local_remove_unused_writes (add_gen a (Varset.remove i live)) b
     else
       local_remove_unused_writes live b
-  | Ld (i, addr) :: b ->
+  | Ld (i, j, a) :: b ->
+    (* TODO: Don't ignore j and a *)
     if Varset.mem i live then
-      Ld (i, addr) ::
+      Ld (i, j, a) ::
       local_remove_unused_writes (Varset.remove i live) b
     else
       local_remove_unused_writes live b
-  | St (i, addr) :: b ->
-    St (i, addr) :: local_remove_unused_writes (Varset.add i live) b
+  | St (i, a1, a2) :: b ->
+    (* TODO: Don't ignore j and a *)
+    St (i, a1, a2) :: local_remove_unused_writes (Varset.add i live) b
   | In i :: b ->
     if Varset.mem i live then
       In i :: local_remove_unused_writes (Varset.remove i live) b

@@ -42,7 +42,7 @@ are not keywords.
 
 Numbers are sequences of digits that fit into a 64-bit signed integer.
 
-Comments start with '//' end last until the end of the line.
+Comments start with '//' and last until the end of the line.
 
 All numerical operations are on signed, 2s complement 64-bit integers.
 
@@ -65,8 +65,8 @@ op ::=
 | `||` --- Logical or  
 | `&&` --- Logical and
 
-uop ::=~~
-| `!`  --- Logical negation~~
+uop ::=  
+| `!`  --- Logical negation  
 | `-`  --- Unary minus
 
 indices ::=  

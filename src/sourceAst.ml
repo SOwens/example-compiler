@@ -176,3 +176,8 @@ let rec parse_program (toks : T.tok_loc list) : stmt list =
     let (s, toks) = parse_stmt toks in
     let s_list = parse_program toks in
     s::s_list
+
+let stmts_to_stmt (s : stmt list) : stmt =
+  match s with
+  | [s1] -> s1
+  | _ -> Stmts s

@@ -44,8 +44,10 @@ type atomic_exp =
 type block_elem =
   | AssignOp of var * atomic_exp * Tokens.op * atomic_exp
   | AssignAtom of var * atomic_exp
-  | Ld of var * atomic_exp
-  | St of var * atomic_exp
+  (* Ld (x,y,e) represents x := *(y+e) *)
+  | Ld of var * var * atomic_exp
+  (* St (x,e1,e2) represents *(x+e1) := e2 *)
+  | St of var * atomic_exp * atomic_exp
   | In of var
   | Out of var
   | Alloc of atomic_exp list

@@ -80,8 +80,10 @@ let shrink_imm_elem (tmp_reg : var) (e : block_elem) : block_elem list =
       | Some n -> assign_imm dest n
       | None -> [e]
     end
-  | Ld (r, addr) -> [e]
-  | St (r, addr) -> [e]
+  | Ld (v1, v2, addr) ->
+    raise Todo
+  | St (r, a1, a2) ->
+    raise Todo
   | In r -> [e]
   | Out r -> [e]
   | Alloc _ ->

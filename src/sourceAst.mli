@@ -53,3 +53,4 @@ type stmt =
 val pp_stmts : Format.formatter -> stmt list -> unit
 
 val parse_program : (Tokens.token * int) list -> stmt list
+val stmts_to_stmt : stmt list -> stmt

@@ -71,8 +71,10 @@ let pp_atomic_exp fmt ae =
 type block_elem =
   | AssignOp of var * atomic_exp * Tokens.op * atomic_exp
   | AssignAtom of var * atomic_exp
-  | Ld of var * atomic_exp
-  | St of var * atomic_exp
+  (* Ld (x,y,e) represents x := *(y+e) *)
+  | Ld of var * var * atomic_exp
+  (* St (x,e1,e2) represents *(x+e1) := e2 *)
+  | St of var * atomic_exp * atomic_exp
   | In of var
   | Out of var
   | Alloc of atomic_exp list
@@ -90,14 +92,16 @@ let pp_block_elem fmt be =
     Format.fprintf fmt "%a := %a"
       pp_var v
       pp_atomic_exp ae
-  | Ld (v, ae) ->
-    Format.fprintf fmt "%a := *%a"
-      pp_var v
+  | Ld (v1, v2, ae) ->
+    Format.fprintf fmt "%a := *(%a+%a)"
+      pp_var v1
+      pp_var v2
       pp_atomic_exp ae
-  | St (v, ae) ->
-    Format.fprintf fmt "*%a := %a"
+  | St (v, ae1, ae2) ->
+    Format.fprintf fmt "*(%a+%a) := %a"
       pp_var v
-      pp_atomic_exp ae
+      pp_atomic_exp ae1
+      pp_atomic_exp ae2
   | In v ->
     Format.fprintf fmt "input %a"
       pp_var v

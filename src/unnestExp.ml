@@ -27,7 +27,7 @@
    type flat_exp =
    | Num of int64
    | Bool of bool
-   | Ident of SourceAst.id * ae list
+   | Ident of SourceAst.id * ae
    | Op of ae * op * ae
    | Uop of ae
    | Array of ae list
@@ -52,7 +52,8 @@ let is_flat (e : exp) : bool =
   | Num _ -> true
   | Bool _ -> true
   | Ident (_, []) -> true
-  | Ident (_, es) -> List.for_all is_atomic es
+  | Ident (_, [e]) -> is_atomic e
+  | Ident (_, _) -> false
   | Op (e1, op, e2) -> is_atomic e1 && is_atomic e2
   | Uop (uop, e) -> is_atomic e
   | Array es -> List.for_all is_atomic es
@@ -65,6 +66,19 @@ let rec unnest (stmts : stmt list) : stmt list =
     let x = !next_ident in
     next_ident := (!next_ident) + 1;
     Temp x
+  in
+
+  (* indices must all be atomic, according to is_atomic above. Returns a flat
+     expression according to is_flat. *)
+  let rec unnest_indices (arr : id) (indices : exp list) : stmt list * exp =
+    match indices with
+    | [] -> ([], Ident (arr, []))
+    | [i] -> ([], Ident (arr, [i]))
+    | (i::indices) ->
+      let id = get_ident () in
+      let (s, e) = unnest_indices id indices in
+      (Assign (id, [], Ident (arr, [i])) :: s,
+       e)
   in
 
   (* Flatten out and expression into a list of statements and an expression by
@@ -81,10 +95,10 @@ let rec unnest (stmts : stmt list) : stmt list =
     match e with
     | Num i -> ([], Num i)
     | Bool b -> ([], Bool b)
-    | Ident (i, []) -> ([], Ident (i, []))
     | Ident (i, es) ->
       let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
-      (List.flatten s_list, Ident (i, aes))
+      let (s_list2, ae) = unnest_indices i aes in
+      (List.flatten s_list @ s_list2, ae)
     | Op (e1, T.And, e2) ->
       let (s1, f1) = unnest_exp e1 in
       let (s2, f2) = unnest_exp e2 in
@@ -136,13 +150,15 @@ let rec unnest (stmts : stmt list) : stmt list =
 
   let rec unnest_stmt (s : stmt) : stmt list =
     match s with
-    | Assign (x, [], e) ->
-      let (s', f) = unnest_exp e in
-        s' @ [Assign (x, [], f)]
     | Assign (x, es, e) ->
       let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
       let (s, f) = unnest_exp e in
-      List.flatten s_list @ s @ [Assign (x, aes, f)]
+      (match unnest_indices x aes with
+       | (s', Ident (i, [])) ->
+         List.flatten s_list @ s' @ s @ [Assign (i, [], f)]
+       | (s', Ident (i, [f'])) ->
+         List.flatten s_list @ s' @ s @ [Assign (i, [f'], f)]
+       | _ -> assert false)
     | DoWhile (s0, e, s1) ->
       let s0' = unnest_stmt s0 in
       let (se1, e') = unnest_exp e in

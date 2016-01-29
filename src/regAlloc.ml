@@ -108,15 +108,17 @@ let count_vars_be (be : block_elem) : unit M.t =
     () <-- M.inc_var r;
     () <-- count_vars_ae ae;
     return ()
-  | Ld (r, ae) ->
+  | Ld (v1, v2, ae) ->
     M.do_ ;
-    () <-- M.inc_var r;
+    () <-- M.inc_var v1;
+    () <-- M.inc_var v2;
     () <-- count_vars_ae ae;
     return ()
-  | St (r, ae) ->
+  | St (r, ae1, ae2) ->
     M.do_ ;
     () <-- M.inc_var r;
-    () <-- count_vars_ae ae;
+    () <-- count_vars_ae ae1;
+    () <-- count_vars_ae ae2;
     return ()
   | In r ->
     M.do_ ;
@@ -175,10 +177,10 @@ let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
     AssignOp (Varmap.find v map, reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)
   | AssignAtom (v, ae) ->
     AssignAtom (Varmap.find v map, reg_alloc_ae map ae)
-  | Ld (v, ae) ->
-    Ld (Varmap.find v map, reg_alloc_ae map ae)
-  | St (v, ae) ->
-    St (Varmap.find v map, reg_alloc_ae map ae)
+  | Ld (v1, v2, ae) ->
+    Ld (Varmap.find v1 map, Varmap.find v2 map, reg_alloc_ae map ae)
+  | St (v, ae1, ae2) ->
+    St (Varmap.find v map, reg_alloc_ae map ae1, reg_alloc_ae map ae2)
   | In v ->
     In (Varmap.find v map)
   | Out v ->
