@@ -24,13 +24,13 @@ module T = Tokens
 
 type id =
   | Source of string
-  | Temp of int
+  | Temp of string * int
   [@@deriving show, ord]
 
 let show_id i =
   match i with
   | Source s -> s
-  | Temp s -> "_tmp" ^ string_of_int s
+  | Temp (s,i) -> "_tmp_" ^ s ^ string_of_int i
 
 module Idord = struct
   type t = id

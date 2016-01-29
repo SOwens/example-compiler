@@ -26,7 +26,7 @@ type var =
   | Vreg of int
   | Stack of int
   | NamedSource of string
-  | NamedTmp of int
+  | NamedTmp of string * int
   [@@deriving ord]
 
 let show_var v =
@@ -34,7 +34,7 @@ let show_var v =
   | Vreg i -> "r" ^ string_of_int i
   | Stack i -> "s" ^ string_of_int i
   | NamedSource s -> s
-  | NamedTmp i -> "tmp" ^ string_of_int i
+  | NamedTmp (s, i) -> "_tmp_" ^ s ^ string_of_int i
 
 let pp_var fmt v =
   Format.fprintf fmt "%s" (show_var v)
@@ -174,9 +174,9 @@ type cfg = cfg_entry list
 let id_to_var (i : S.id) : var =
   match i with
   | S.Source s -> NamedSource s
-  | S.Temp i -> NamedTmp i
+  | S.Temp (s, i) -> NamedTmp (s, i)
 
-let bool_to_num b = 
+let bool_to_num b =
   if b then Num 1L else Num 0L
 
 let exp_to_atomic (e : S.exp) : atomic_exp =

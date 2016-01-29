@@ -61,11 +61,11 @@ let is_flat (e : exp) : bool =
 let rec unnest (stmts : stmt list) : stmt list =
 
   (* Generate unique names for temporary variables *)
-  let next_ident = ref 1 in
+  let next_ident = ref 0 in
   let get_ident () : id =
     let x = !next_ident in
     next_ident := (!next_ident) + 1;
-    Temp x
+    Temp ("UE", x)
   in
 
   (* indices must all be atomic, according to is_atomic above. Returns a flat

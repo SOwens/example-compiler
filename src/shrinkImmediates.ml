@@ -95,5 +95,5 @@ let shrink_imm (cfg : cfg) : cfg =
        { cfg_entry with
          elems =
            List.flatten
-             (List.map (shrink_imm_elem (NamedTmp 0)) cfg_entry.elems) })
+             (List.map (shrink_imm_elem (NamedTmp ("SI", 0))) cfg_entry.elems) })
     cfg

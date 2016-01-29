@@ -21,7 +21,7 @@
 
 type id =
   | Source of string
-  | Temp of int
+  | Temp of string * int
   [@@deriving show, ord]
 
 module Idmap : Map.S with type key = id

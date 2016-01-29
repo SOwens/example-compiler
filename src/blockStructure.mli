@@ -23,7 +23,7 @@ type var =
   | Vreg of int
   | Stack of int
   | NamedSource of string
-  | NamedTmp of int
+  | NamedTmp of string * int
   [@@deriving show]
 
 module Varset : sig
