@@ -112,7 +112,7 @@ let keyword_re =
     (String.concat "\\|"
        (List.map (fun (s, _) -> Str.quote s) keywords))
 let number_re = Str.regexp "[0-9]+"
-let ident_re = Str.regexp "[a-zA-Z][a-zA-Z0-9]*"
+let ident_re = Str.regexp "[a-zA-Z_][a-zA-Z0-9_]*"
 let space_re = Str.regexp "[ \t]+\\|//.*"
 let newline_re = Str.regexp "\n"
 

@@ -37,8 +37,8 @@ The source language
 
 Keywords are `+ - * / | & << < > = || && ! := do while if then else input output true false array`
 
-Identifiers are strings of letters and digits (starting with a letter) that
-are not keywords.
+Identifiers are strings of letters, underscores, and digits (not starting with
+a digit) that are not keywords.
 
 Numbers are sequences of digits that fit into a 64-bit signed integer.
 
