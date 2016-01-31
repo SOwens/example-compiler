@@ -37,8 +37,8 @@ let tok_to_binop t =
 let num_regs = 11
 
 (* Save RSP and RBP for stack stuff,
-   save RAX for scratch, and index it by -1
-   very pessimistically save RDX for division *)
+   save RAX and RDX for scratch, and index RAX by -1
+   RAX and RDX are chosen because division needs them *)
 let reg_numbers =
   [(-1, RAX);
    (0, RBX);
@@ -54,11 +54,47 @@ let reg_numbers =
    (10, R14);
    (11, R15)]
 
-let var_to_rm v : rm =
+(* Convert a variable, which can be a register or stack slot, to a rm *)
+let var_to_rm (v : var) : rm =
   match v with
   | Vreg i -> Zr (List.assoc i reg_numbers)
   | Stack i -> Zm (None, Some RBP, Some (Int64.of_int (-8 * (i+1))))
   | _ -> raise (Util.InternalError "named variable in instrSelX86")
+
+(* Convert a heap reference, which is a variable to be deferenced, offset by
+   another variable or immediate *)
+let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
+  match (base, offset) with
+  | (Vreg b, Num o) ->
+    ([], Zm (None, Some (List.assoc b reg_numbers), Some o))
+  | (Vreg b, Ident (Vreg o)) ->
+    ([],
+     Zm (Some (1, List.assoc o reg_numbers),
+         Some (List.assoc b reg_numbers),
+         None))
+  | (Vreg b, Ident (Stack i)) ->
+    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)))],
+     Zm (Some (1, RAX),
+         Some (List.assoc b reg_numbers),
+         None))
+  | (Stack i, Num o) ->
+    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)))],
+     Zm (None, Some RAX, Some o))
+  | (Stack i, Ident (Vreg r)) ->
+    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)))],
+     Zm (Some (1, List.assoc r reg_numbers),
+         Some RAX,
+         None))
+  | (Stack i, Ident (Stack j)) ->
+    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)));
+      Zmov (Zr_rm (RAX, var_to_rm (Stack j)))],
+     Zm (Some (1, RDX),
+         Some RAX,
+         None))
+  | ((NamedSource _ | NamedTmp _), _) ->
+    raise (Util.InternalError "Named variables in instrSelX86")
+  | (_, Ident (NamedSource _ | NamedTmp _)) ->
+    raise (Util.InternalError "Named variables in instrSelX86")
 
 (* Build the operation for r := r op ae *)
 let build_to_reg_op op r ae =
@@ -194,7 +230,22 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
           (* Can't do a memory-to-memory move *)
           [Zmov (Zr_rm (r_scratch, m2));
            Zmov (Zrm_r (m1, r_scratch))]))
-  | Ld _ | St _ -> raise Todo
+  | Ld (v1, v2, ae) ->
+    let (instrs, src_m) = heap_to_rm v2 ae in
+    instrs @
+    (match var_to_rm v1 with
+     | Zr r -> [Zmov (Zr_rm (r, src_m))]
+     | Zm _ as dest_m->
+       [Zmov (Zr_rm (RAX, src_m));
+        Zmov (Zrm_r (dest_m, RAX))])
+  | St (v, ae1, ae2) ->
+    let (instrs, dest_m) = heap_to_rm v ae1 in
+    instrs @
+    (match var_to_rm v with
+     | Zr r -> [Zmov (Zrm_r (dest_m, r))]
+     | Zm _ as src_m ->
+       [Zmov (Zr_rm (RAX, src_m));
+        Zmov (Zrm_r (dest_m, RAX))])
   | In v ->
     caller_save @
     [Zcall ((if underscore_labels then "_" else "") ^ "input")] @

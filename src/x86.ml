@@ -73,9 +73,16 @@ let show_byte_reg (B r) =
 let pp_byte_reg fmt r =
   fprintf fmt "%s" (show_byte_reg r)
 
+type address_component =
+  | EAScaled of int * reg
+  | EAReg of reg
+  | EAConst of int64
+
 type rm =
   | Zr of reg                                          (* register *)
-  | Zm of (int * reg) option * reg option * int64 option (* mem[2^{scale} * index + base + displacement] *)
+  (* Zm (Some (scale, index), Some base, Some displacement) =
+     mem[scale * index + base + displacement] *)
+  | Zm of (int * reg) option * reg option * int64 option
 
 let rec simple_add_exp fmt l =
   match l with
