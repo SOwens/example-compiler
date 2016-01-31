@@ -118,6 +118,13 @@ fprintf fmt "[section .text align=16]@\n";;
 fprintf fmt "global %smain@\n@\n" under;;
 fprintf fmt "extern %sinput@\n" under;;
 fprintf fmt "extern %soutput@\n@\n" under;;
+fprintf fmt "extern %sallocate1@\n@\n" under;;
+fprintf fmt "extern %sallocate2@\n@\n" under;;
+fprintf fmt "extern %sallocate3@\n@\n" under;;
+fprintf fmt "extern %sallocate4@\n@\n" under;;
+fprintf fmt "extern %sallocate5@\n@\n" under;;
+fprintf fmt "extern %sallocate6@\n@\n" under;;
+fprintf fmt "extern %sallocate7@\n@\n" under;;
 fprintf fmt "%smain:@\n" under;;
 fprintf fmt "%a" X86.pp_instr_list x86;;
 (* Prepare for exit system call *)

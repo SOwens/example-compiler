@@ -7,7 +7,7 @@
 # OPTIONS = -linux
 
 COMPILER = ../src/compile.byte
-EXEC_FILES = fact.exe
+EXEC_FILES = fact.exe array.exe
 
 .PHONY : all clean
 
@@ -25,7 +25,7 @@ all : $(EXEC_FILES)
 # creation), because there's a bunch of book keeping and alignment
 # stuff to sort out. gcc/libc include code to do that for us.
 %.exe : %.o ../runtime/io.o
-	gcc ../runtime/io.o $< -o $@
+	gcc ../runtime/io.o ../runtime/array.o $< -o $@
 
 .PRECIOUS : %.s
 

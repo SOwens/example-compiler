@@ -326,7 +326,7 @@ let test_to_x86 ae1 ae2 : instruction * bool =
      | (Zm _, Zm _) ->
        raise TODO)
   | (Num _, Num _) ->
-    raise (Util.InternalError "2 immediates in insteSelX86")
+    raise (Util.InternalError "2 immediates in instrSelX86")
 
 let op_to_cc b op =
   match (b, op) with

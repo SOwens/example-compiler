@@ -31,7 +31,3 @@ void output(long i) {
   printf("%ld\n", i);
   return;
 }
-
-long* array(long i) {
-  return malloc(i * sizeof(long));
-};

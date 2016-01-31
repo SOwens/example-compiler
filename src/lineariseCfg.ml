@@ -32,7 +32,7 @@ let pp_linear fmt l =
   | Instr b ->
     Format.fprintf fmt "  %a@\n" pp_block_elem b
   | CJump (v, b, s) ->
-    Format.fprintf fmt "  if %a = %s goto %s@\n"
+    Format.fprintf fmt "  if (%a) = %s goto %s@\n"
       pp_test v
       (if b then "true" else "false")
       s

@@ -88,7 +88,7 @@ let rec simple_add_exp fmt l =
   match l with
   | [] -> ()
   | [Some x] -> fprintf fmt "%s" x
-  | [None] -> ()
+  | [None] -> fprintf fmt "0"
   | Some x :: y -> fprintf fmt "%s + %a" x simple_add_exp y
   | None :: y -> simple_add_exp fmt y
 
