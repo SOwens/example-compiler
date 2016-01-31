@@ -24,7 +24,7 @@ all : $(EXEC_FILES)
 # enter at _start (which is where the OS dumps you on process
 # creation), because there's a bunch of book keeping and alignment
 # stuff to sort out. gcc/libc include code to do that for us.
-%.exe : %.o ../runtime/io.o
+%.exe : %.o ../runtime/io.o ../runtime/array.o
 	gcc ../runtime/io.o ../runtime/array.o $< -o $@
 
 .PRECIOUS : %.s
