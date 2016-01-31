@@ -77,7 +77,7 @@ type block_elem =
   | St of var * atomic_exp * atomic_exp
   | In of var
   | Out of var
-  | Alloc of atomic_exp list
+  | Alloc of var * atomic_exp list
   [@@deriving show]
 
 let pp_block_elem fmt be =
@@ -108,8 +108,9 @@ let pp_block_elem fmt be =
   | Out v ->
     Format.fprintf fmt "output %a"
       pp_var v
-  | Alloc vs ->
-    Format.fprintf fmt "alloc%a"
+  | Alloc (v, vs) ->
+    Format.fprintf fmt "%a := alloc%a"
+      pp_var v
       (pp_list pp_atomic_exp) vs
 
 type basic_block = block_elem list
@@ -218,7 +219,7 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
   | S.Uop (Tokens.Not, ae) ->
     raise (InternalError "not in blockStructure")
   | S.Array es ->
-    [Alloc (List.map exp_to_atomic es)]
+    [Alloc (v, List.map exp_to_atomic es)]
 
 let op_to_test_op op =
   match op with

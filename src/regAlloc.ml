@@ -18,7 +18,6 @@
 
 open Util
 open BlockStructure
-exception Todo
 
 (* The basic type signature of a monad *)
 module type Monad = sig
@@ -91,7 +90,7 @@ let count_vars_ae (ae : atomic_exp) : unit M.t =
   match ae with
   | Ident r ->
     M.do_ ;
-    () <-- M.inc_var r;
+    M.inc_var r;
     return ()
   | Num x -> M.return ()
 
@@ -99,37 +98,41 @@ let count_vars_be (be : block_elem) : unit M.t =
   match be with
   | AssignOp (r, ae1, op, ae2) ->
     M.do_ ;
-    () <-- M.inc_var r;
-    () <-- count_vars_ae ae1;
-    () <-- count_vars_ae ae2;
+    M.inc_var r;
+    count_vars_ae ae1;
+    count_vars_ae ae2;
     return ()
   | AssignAtom (r, ae) ->
     M.do_ ;
-    () <-- M.inc_var r;
-    () <-- count_vars_ae ae;
+    M.inc_var r;
+    count_vars_ae ae;
     return ()
   | Ld (v1, v2, ae) ->
     M.do_ ;
-    () <-- M.inc_var v1;
-    () <-- M.inc_var v2;
-    () <-- count_vars_ae ae;
+    M.inc_var v1;
+    M.inc_var v2;
+    count_vars_ae ae;
     return ()
   | St (r, ae1, ae2) ->
     M.do_ ;
-    () <-- M.inc_var r;
-    () <-- count_vars_ae ae1;
-    () <-- count_vars_ae ae2;
+    M.inc_var r;
+    count_vars_ae ae1;
+    count_vars_ae ae2;
     return ()
   | In r ->
     M.do_ ;
-    () <-- M.inc_var r;
+    M.inc_var r;
     return ()
   | Out r ->
     M.do_ ;
-    () <-- M.inc_var r;
+    M.inc_var r;
     return ()
-  | Alloc _ ->
-    raise Todo
+  | Alloc (i, aes) ->
+    M.do_ ;
+    M.inc_var i;
+    mapM_ count_vars_ae aes;
+    return ()
+
 
 let count_vars_test (ae1, op, ae2) : unit M.t =
   let vars =
@@ -147,17 +150,17 @@ let count_vars_nb (nb : next_block) : unit M.t =
   | Next i -> M.return ()
   | Branch (r, t1, t2) ->
     M.do_ ;
-    () <-- count_vars_test r;
+    count_vars_test r;
     return ()
 
 let count_vars (cfg : cfg) : int Varmap.t =
   let m =
     M.do_ ;
-    () <-- mapM_
+    mapM_
       (fun e ->
          M.do_ ;
-         () <-- mapM_ count_vars_be e.elems;
-         () <-- count_vars_nb e.next;
+         mapM_ count_vars_be e.elems;
+         count_vars_nb e.next;
          return ())
       cfg;
     map <-- M.get_counts;
@@ -185,8 +188,8 @@ let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
     In (Varmap.find v map)
   | Out v ->
     Out (Varmap.find v map)
-  | Alloc _ ->
-    raise Todo
+  | Alloc (v, aes) ->
+    Alloc (Varmap.find v map, List.map (reg_alloc_ae map) aes)
 
 let reg_alloc_test (map : var Varmap.t) (ae1, op, ae2) : test =
   (reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)

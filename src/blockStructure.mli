@@ -50,7 +50,7 @@ type block_elem =
   | St of var * atomic_exp * atomic_exp
   | In of var
   | Out of var
-  | Alloc of atomic_exp list
+  | Alloc of var * atomic_exp list
   [@@deriving show]
 
 type basic_block = block_elem list

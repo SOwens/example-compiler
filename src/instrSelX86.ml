@@ -18,12 +18,12 @@
 
 (* Convert linearised three-address code to x86-64 *)
 
+exception TODO
+
 open BlockStructure
 open X86
 module L = LineariseCfg
 module T = Tokens
-
-exception Todo
 
 let tok_to_binop t =
   match t with
@@ -162,6 +162,46 @@ let caller_restore =
    Zpop (Zr RDX);
    Zpop (Zr RCX)]
 
+let reg_list = [RDI; RSI; RDX; RCX; R8; R9]
+
+let stack_reg_to_offset r =
+  match r with
+  | RDI -> 32L
+  | RSI -> 40L
+  | RDX -> 48L
+  | RCX -> 56L
+  | R8 -> 24L
+  | _ -> assert false
+
+let reg_ae_to_dest_src (overwritten_regs : reg list) dest_r ae =
+  match ae with
+  | Num n -> Some (Zrm_i (Zr dest_r, n))
+  | Ident (Stack i) -> Some (Zr_rm (dest_r, var_to_rm (Stack i)))
+  | Ident (Vreg src_r) ->
+    let src_r = List.assoc src_r reg_numbers in
+    if src_r = dest_r then
+      None
+    else if List.mem src_r overwritten_regs then
+      Some (Zr_rm (dest_r,
+                   Zm (None, Some RSP, Some (stack_reg_to_offset src_r))))
+    else
+      Some (Zr_rm (dest_r, Zr src_r))
+  | Ident (NamedSource _ | NamedTmp _) ->
+    raise (Util.InternalError "Named variable in instrSelX86")
+
+let rec setup_args (aes : atomic_exp list) remaining_regs overwritten_regs
+  : instruction list =
+  match (aes, remaining_regs) with
+  | ([], _) -> []
+  | (a :: aes, next :: regs) ->
+    (match reg_ae_to_dest_src overwritten_regs next a with
+     | None ->
+       []
+     | Some arg ->
+       [Zmov arg]) @
+    setup_args aes regs (next :: overwritten_regs)
+  | _ -> raise TODO
+
 let rec be_to_x86 (underscore_labels : bool) be : instruction list =
   match be with
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
@@ -256,8 +296,17 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     [Zmov (Zr_rm (RDI, var_to_rm v));
      Zcall ((if underscore_labels then "_" else "") ^ "output")] @
     caller_restore
-  | Alloc _ ->
-    raise Todo
+  | Alloc (v, aes) ->
+    let alloc_name =
+      (if underscore_labels then "_" else "") ^
+      "allocate" ^
+      string_of_int (List.length aes)
+    in
+    caller_save @
+    setup_args aes reg_list [] @
+    [Zcall alloc_name] @
+    caller_restore @
+    [Zmov (Zrm_r (var_to_rm v, RAX))]
 
 (* Return a boolean true if the condition needs to be negated *)
 let test_to_x86 ae1 ae2 : instruction * bool =
@@ -275,7 +324,7 @@ let test_to_x86 ae1 ae2 : instruction * bool =
      | (Zr r, (Zm _ as m)) ->
        (Zbinop (Zcmp, Zr_rm (r, m)), false)
      | (Zm _, Zm _) ->
-       raise Todo)
+       raise TODO)
   | (Num _, Num _) ->
     raise (Util.InternalError "2 immediates in insteSelX86")
 

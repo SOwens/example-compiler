@@ -18,7 +18,6 @@
 
 open Util
 open BlockStructure
-exception Todo
 
 type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }
   [@@deriving show]
@@ -26,11 +25,17 @@ type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }
 type cfg = (cfg_entry * cfg_annot) list
   [@@deriving show]
 
-(* Add the assigned identifier in a to the generation set *)
+(* Add the identifier in a to the generation set *)
 let add_gen (a : atomic_exp) (gen : Varset.t) : Varset.t =
   match a with
   | Num _ -> gen
   | Ident i -> Varset.add i gen
+
+(* Add the identifiers in aes to the generation set *)
+let rec add_gen_list (aes : atomic_exp list) (gen : Varset.t) : Varset.t =
+  match aes with
+  | [] -> gen
+  | a::aes -> add_gen_list aes (add_gen a gen)
 
 (* Compute the gen and kill sets for a basic block, live_exit is set to empty *)
 let analyse_block (b : basic_block) : cfg_annot =
@@ -55,7 +60,8 @@ let analyse_block (b : basic_block) : cfg_annot =
       analyse_block (Varset.remove i gen) (Varset.add i kill) b
     | Out i :: b ->
       analyse_block (Varset.add i gen) kill b
-    | Alloc _ :: b -> raise Todo
+    | Alloc (i, aes) :: b ->
+      analyse_block (add_gen_list aes (Varset.remove i gen)) (Varset.add i kill) b
   in
   let (gen,kill) = analyse_block Varset.empty Varset.empty (List.rev b) in
   { gen = gen; kill = kill; live_exit = Varset.empty }
@@ -149,7 +155,9 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
       local_remove_unused_writes live b
   | Out i :: b ->
     Out i :: local_remove_unused_writes (Varset.add i live) b
-  | Alloc _ :: b -> raise Todo
+  | Alloc (i, aes) :: b ->
+    Alloc (i, aes) ::
+    local_remove_unused_writes (add_gen_list aes (Varset.remove i live)) b
 
 let add_test_vars (ae1, op, ae2) vars =
   let vars' =

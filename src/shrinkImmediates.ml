@@ -22,8 +22,6 @@
 
 open BlockStructure
 
-exception Todo
-
 let tmp_var = NamedTmp ("SI",0)
 let tmp_var2 = NamedTmp ("SI",1)
 
@@ -105,8 +103,19 @@ let shrink_imm_elem (e : block_elem) : block_elem list =
     end
   | In r -> [e]
   | Out r -> [e]
-  | Alloc _ ->
-    raise Todo
+  | Alloc (v, aes) ->
+    let (s, es, _) =
+      List.fold_right
+        (fun (ae : atomic_exp) ((s : block_elem list), es, n) ->
+           match get_large_imm ae with
+           | None -> (s, ae::es, n)
+           | Some imm ->
+             (assign_imm (NamedTmp ("SI",n)) imm @ s, Ident tmp_var::es, n + 1))
+        aes
+        ([], [], 2)
+    in
+    s @ [Alloc (v, es)]
+
 
 let shrink_imm (cfg : cfg) : cfg =
   List.map
