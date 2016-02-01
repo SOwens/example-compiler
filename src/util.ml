@@ -22,7 +22,7 @@ exception InternalError of string
 module Strmap = Map.Make(String)
 
 let count (n : int) : int list =
-  let rec f n next = 
+  let rec f n next =
     if n <= 0 then
       []
     else
@@ -45,7 +45,7 @@ let pp_list' d1 d2 pp fmt l =
         pp h
         f t
   in
-    Format.fprintf fmt "@[%s%a%s@]" d1 f l d2
+    Format.fprintf fmt "%s@[%a@]%s" d1 f l d2
 
 let pp_list pp = pp_list' "[" "]" pp
 let pp_set pp = pp_list' "{" "}" pp

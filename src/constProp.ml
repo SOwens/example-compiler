@@ -226,11 +226,11 @@ let rec prop_stmts (env : exp Idmap.t) (stmts : stmt list)
        let env1 = prop_loop_body env_init [s1; s0] in
        (* Now re-calculate the constant propagation for the things constant no
           matter how many times we iterate the loop *)
-       let (_, t0) = prop_stmt env1 s0 in
-       let o = fold_exp env1 e in
        let (_, t1) = prop_stmt env1 s1 in
+       let o = fold_exp env1 e in
+       let (_, t0) = prop_stmt env1 s0 in
        let (env',stmts') = prop_stmts env1 stmts in
-       (env1, DoWhile (t0, o, t1) :: stmts'))
+       (env', DoWhile (t0, o, t1) :: stmts'))
   | Ite (e, s1, s2) :: stmts ->
     let o1 = fold_exp env e in
     (match o1 with

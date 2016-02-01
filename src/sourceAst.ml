@@ -25,12 +25,15 @@ module T = Tokens
 type id =
   | Source of string
   | Temp of string * int
-  [@@deriving show, ord]
+  [@@deriving ord]
 
 let show_id i =
   match i with
   | Source s -> s
   | Temp (s,i) -> "_tmp_" ^ s ^ string_of_int i
+
+let pp_id fmt i =
+  Format.fprintf fmt "%s" (show_id i)
 
 module Idord = struct
   type t = id
@@ -50,6 +53,39 @@ type exp =
   | Array of exp list
   [@@deriving show]
 
+let rec pp_array_list f fmt l =
+  match l with
+  | [] -> ()
+  | (h::t) ->
+    Format.fprintf fmt "[@[%a@]]@,%a"
+      f h
+      (pp_array_list f) t
+
+let rec pp_exp fmt exp =
+  match exp with
+  | Ident (id, []) ->
+    Format.fprintf fmt "%a"
+      pp_id id
+  | Ident (id, es) ->
+    Format.fprintf fmt "%a%a"
+      pp_id id
+      (pp_array_list pp_exp) es
+  | Num n -> Format.fprintf fmt "%Ld" n
+  | Bool true -> Format.fprintf fmt "true"
+  | Bool false -> Format.fprintf fmt "false"
+  | Op (e1, op, e2) ->
+    Format.fprintf fmt "(@[%a@ %s@ %a@])"
+      pp_exp e1
+      (Tokens.op_to_string op)
+      pp_exp e2
+  | Uop (uop, e) ->
+    Format.fprintf fmt "@[<2>%s@ %a@]"
+      (Tokens.uop_to_string uop)
+      pp_exp e
+  | Array es ->
+    Format.fprintf fmt "@[<2>array@ %a@]"
+      (pp_array_list pp_exp) es
+
 (* AST of statements *)
 type stmt =
   | Assign of id * exp list * exp
@@ -64,6 +100,47 @@ type stmt =
   | Out of id
   | Loc of stmt * int (* annotate a statement with it's source line number *)
   [@@deriving show]
+
+let rec pp_stmt fmt stmt =
+  match stmt with
+  | Assign (id, [], e) ->
+    Format.fprintf fmt "@[<2>%a :=@ %a@]"
+      pp_id id
+      pp_exp e
+  | Assign (id, es, e) ->
+    Format.fprintf fmt "@[<2>%a%a :=@ %a@]"
+      pp_id id
+      (pp_array_list pp_exp) es
+      pp_exp e
+  | DoWhile (Stmts [], e, s) ->
+    Format.fprintf fmt "@[<2>while@ %a@ %a@]"
+      pp_exp e
+      pp_stmt s
+  | DoWhile (s, e, Stmts []) ->
+    Format.fprintf fmt "@[<2>do@ %a@ while@ %a@]"
+      pp_stmt s
+      pp_exp e
+  | DoWhile (s1, e, s2) ->
+    Format.fprintf fmt "@[<2>do@ %a@ while@ %a@ %a@]"
+      pp_stmt s1
+      pp_exp e
+      pp_stmt s2
+  | Ite (e, s1, s2) ->
+    Format.fprintf fmt "@[<2>if@ %a@ then@ %a@ else@ %a@]"
+      pp_exp e
+      pp_stmt s1
+      pp_stmt s2
+  | Stmts slist ->
+    Format.fprintf fmt "%a"
+      (pp_set pp_stmt) slist
+  | In i ->
+    Format.fprintf fmt "@[<2>input@ %a@]"
+      pp_id i
+  | Out i ->
+    Format.fprintf fmt "@[<2>output@ %a@]"
+      pp_id i
+  | Loc (s, _) ->
+    pp_stmt fmt s
 
 let pp_stmts fmt (stmts : stmt list) : unit =
   Format.fprintf fmt "%a"

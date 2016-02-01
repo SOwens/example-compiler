@@ -1,4 +1,16 @@
 {
+  x := array[10]
+  i := 0
+  while i < 10 {
+    x[i] := i
+    i := i + 1
+  }
+  output i
+}
+
+
+
+{
   x := array[3][5][7]
   count := 0
   i := 0
