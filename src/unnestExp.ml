@@ -151,9 +151,12 @@ let rec unnest (stmts : stmt list) : stmt list =
 
   let rec unnest_stmt (s : stmt) : stmt list =
     match s with
+    | Assign (x, [], e) ->
+      let (s, f) = unnest_exp e in
+      s @ [Assign (x, [], f)]
     | Assign (x, es, e) ->
       let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
-      let (s, f) = unnest_exp e in
+      let (s, f) = unnest_exp_atomic e in
       (match unnest_indices x aes with
        | (s', Ident (i, [])) ->
          List.flatten s_list @ s' @ s @ [Assign (i, [], f)]

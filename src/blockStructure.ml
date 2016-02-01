@@ -289,10 +289,10 @@ let build_cfg (stmts : S.stmt list) : cfg =
       let new_block_elems =
         (match ae with
          | Num n ->
-           [St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3), ae);
+           [St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3), exp_to_atomic e);
             get_len]
          | _ ->
-           [St (id_to_var x, Ident tmp_var, ae);
+           [St (id_to_var x, Ident tmp_var, exp_to_atomic e);
             AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
             AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
             get_len])

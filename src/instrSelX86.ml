@@ -61,6 +61,20 @@ let var_to_rm (v : var) : rm =
   | Stack i -> Zm (None, Some RBP, Some (Int64.of_int (-8 * (i+1))))
   | _ -> raise (Util.InternalError "named variable in instrSelX86")
 
+let rm_rm_to_dest_src (dest_rm : rm) (src_rm : rm)
+  : instruction list * dest_src =
+  match (dest_rm, src_rm) with
+  | (Zr r, _) -> ([], Zr_rm (r, src_rm))
+  | (_, Zr r) -> ([], Zrm_r (dest_rm, r))
+  | (Zm _, Zm _) ->
+    ([Zmov (Zr_rm (RAX, src_rm))], Zrm_r (dest_rm, RAX))
+
+let rm_ae_to_dest_src (dest_rm : rm) (src_ae : atomic_exp)
+  : instruction list * dest_src =
+  match src_ae with
+  | Num i -> ([], Zrm_i (dest_rm, i))
+  | Ident src_var -> rm_rm_to_dest_src dest_rm (var_to_rm src_var)
+
 (* Convert a heap reference, which is a variable to be deferenced, offset by
    another variable or immediate *)
 let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
@@ -97,7 +111,8 @@ let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
     raise (Util.InternalError "Named variables in instrSelX86")
 
 (* Build the operation for r := r op ae *)
-let build_to_reg_op op r ae =
+let build_to_reg_op (op : Tokens.op) (r : reg) (ae : atomic_exp)
+  : instruction list =
   match (op, ae) with
   | ((T.Plus | T.Minus | T.Lshift | T.BitOr | T.BitAnd), Num i) ->
     [Zbinop (tok_to_binop op, Zrm_i (Zr r, i))]
@@ -208,28 +223,16 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     (* constant prop ensures both aren't immediate *)
     be_to_x86 underscore_labels (AssignOp (v, ae2, reverse_op op, Num imm))
   | AssignOp (v, Ident v2, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
-    let cmp_instr =
-      match ae2 with
-      | Num i ->
-        [Zbinop (Zcmp, Zrm_i (var_to_rm v2, i))]
-      | Ident v3 ->
-        (match (var_to_rm v2, var_to_rm v3) with
-         | (rm2, Zr r3) ->
-           [Zbinop (Zcmp, Zrm_r (rm2, r3))]
-         | (Zr r2, rm3) ->
-           [Zbinop (Zcmp, Zr_rm (r2, rm3))]
-         | ((Zm _ as m2), (Zm _ as m3)) ->
-           [Zmov (Zr_rm (r_scratch, m2));
-            Zbinop (Zcmp, Zr_rm (r_scratch, m3))])
-    in
+    let (instrs, cmp_arg) = rm_ae_to_dest_src (var_to_rm v2) ae2 in
+    let cmp_instrs = instrs @ [Zbinop (Zcmp, cmp_arg)] in
     (match var_to_rm v with
      | Zm _ as m ->
-       cmp_instr @
+       cmp_instrs @
        [Zset (op_to_cond op, B r_scratch);
         Zbinop (Zand, Zrm_i (Zr r_scratch, 1L));
         Zmov (Zrm_r (m, r_scratch))]
      | Zr r ->
-       cmp_instr @
+       cmp_instrs @
        [Zset (op_to_cond op, B r);
         Zbinop (Zand, Zrm_i (Zr r, 1L))])
   | AssignOp (v, ae1, ((T.Plus | T.Minus | T.Lshift | T.BitOr
@@ -256,36 +259,20 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
   | AssignOp (_, _, (T.And | T.Or), _) ->
     raise (Util.InternalError "And/Or in instrSelX86")
   | AssignAtom (v, ae) ->
-    (* Essentially special casing the AssignOp case above *)
-    (match (var_to_rm v, ae) with
-     | (rm1, Num i) ->
-       [Zmov (Zrm_i (rm1, i))]
-     | (Zr r1, Ident v) ->
-       [Zmov (Zr_rm (r1, var_to_rm v))]
-     | (Zm _ as m1, Ident v2) ->
-       (match var_to_rm v2 with
-        | Zr r2 ->
-          [Zmov (Zrm_r (m1, r2))]
-        | Zm _ as m2 ->
-          (* Can't do a memory-to-memory move *)
-          [Zmov (Zr_rm (r_scratch, m2));
-           Zmov (Zrm_r (m1, r_scratch))]))
+    let (instrs, mov_arg) = rm_ae_to_dest_src (var_to_rm v) ae in
+    instrs @ [Zmov mov_arg]
   | Ld (v1, v2, ae) ->
-    let (instrs, src_m) = heap_to_rm v2 ae in
+    let (instrs, src_rm) = heap_to_rm v2 ae in
+    let (instrs2, dest_src) = rm_rm_to_dest_src (var_to_rm v1) src_rm in
     instrs @
-    (match var_to_rm v1 with
-     | Zr r -> [Zmov (Zr_rm (r, src_m))]
-     | Zm _ as dest_m->
-       [Zmov (Zr_rm (RAX, src_m));
-        Zmov (Zrm_r (dest_m, RAX))])
+    instrs2 @
+    [Zmov dest_src]
   | St (v, ae1, ae2) ->
-    let (instrs, dest_m) = heap_to_rm v ae1 in
+    let (instrs, dest_rm) = heap_to_rm v ae1 in
+    let (instrs2, dest_src) = rm_ae_to_dest_src dest_rm ae2 in
     instrs @
-    (match var_to_rm v with
-     | Zr r -> [Zmov (Zrm_r (dest_m, r))]
-     | Zm _ as src_m ->
-       [Zmov (Zr_rm (RAX, src_m));
-        Zmov (Zrm_r (dest_m, RAX))])
+    instrs2 @
+    [Zmov dest_src]
   | In v ->
     caller_save @
     [Zcall ((if underscore_labels then "_" else "") ^ "input")] @
