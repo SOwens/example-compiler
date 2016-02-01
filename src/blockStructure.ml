@@ -190,6 +190,7 @@ let exp_to_atomic (e : S.exp) : atomic_exp =
 
 let tmp_var = NamedTmp("BS", 0)
 
+(* Convert x := e into block elements, returned in *reverse* order *)
 let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
   let v = id_to_var x in
   match e with
@@ -204,12 +205,12 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
     (* TODO assert ae < tmp_var *)
     (match ae with
      | Num n ->
-       [get_len; Ld (v, id_to_var id, Num (Int64.shift_left (Int64.add n 1L) 3))]
+       [Ld (v, id_to_var id, Num (Int64.shift_left (Int64.add n 1L) 3)); get_len]
      | _ ->
-       [get_len;
-        AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+       [Ld (v, id_to_var id, Ident tmp_var);
         AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
-        Ld (v, id_to_var id, Ident tmp_var)])
+        AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+        get_len])
   | S.Ident (id, _::_::_) ->
     raise (InternalError "multi-dimension array index in blockStructure")
   | S.Num n -> [AssignAtom (v, Num n)]
@@ -264,7 +265,7 @@ let build_cfg (stmts : S.stmt list) : cfg =
 
   (* Convert stmts to basic blocks, and add them to the_cfg.
      block_num is the index for the block being created.
-     block_acc contains the elements seen so far, in reverse order.
+     block_acc contains the elements seen so far, in *reverse* order.
      ret_block is the control flow out of the block being created.
 
      The AST must be in a restricted form:
@@ -275,8 +276,7 @@ let build_cfg (stmts : S.stmt list) : cfg =
   let rec find_blocks (block_num : int) (block_acc : basic_block)
       (ret_block : next_block) (stmts : S.stmt list) : unit =
     match stmts with
-    | [] ->
-      add_block block_num block_acc ret_block
+    | [] -> add_block block_num block_acc ret_block
     | S.Assign (x, [], e) :: s1 ->
       find_blocks block_num (flat_e_to_assign x e @ block_acc) ret_block s1
     | S.Assign (x, [ae], e) :: s1 ->
@@ -289,13 +289,13 @@ let build_cfg (stmts : S.stmt list) : cfg =
       let new_block_elems =
         (match ae with
          | Num n ->
-           [get_len;
-            St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3), ae)]
+           [St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3), ae);
+            get_len]
          | _ ->
-           [get_len;
-            AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+           [St (id_to_var x, Ident tmp_var, ae);
             AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
-            St (id_to_var x, Ident tmp_var, ae)])
+            AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+            get_len])
       in
       find_blocks block_num (new_block_elems @ block_acc) ret_block s1
     | S.Assign (x, _::_::_, e) :: s1 ->

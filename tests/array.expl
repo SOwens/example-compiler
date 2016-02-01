@@ -8,8 +8,6 @@
   output i
 }
 
-
-
 {
   x := array[3][5][7]
   count := 0
@@ -27,6 +25,8 @@
     }
     i := i + 1
   }
+  o := x[0][0][0]
+  output o
   o := x[2][3][4]
   output o
 }

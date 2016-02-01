@@ -20,20 +20,23 @@
 #include <assert.h>
 
 long* allocate1(long dim1) {
-  long* x = malloc(8*dim1);
+  long* x = malloc(8*(dim1+1));
   for (long i = 0; i < dim1; i++)
-    x[i] = 0;
+    x[i+1] = 0;
+  x[0] = dim1;
   return x;
 }
 
 long* allocate2(long dim1, long dim2) {
-  long** x = malloc(8*dim1);
+  long** x = malloc(8*(dim1+1));
   for (long i = 0; i < dim1; i++) {
-    long* y = malloc(8*dim2);
-    x[i] = y;
+    long* y = malloc(8*(dim2+1));
+    x[i+1] = y;
     for (long j = 0; j < dim2; j++)
-      y[j] = 0;
+      y[j+1] = 0;
+    y[0] = dim2;
   }
+  ((long*)x)[0] = dim1;
   return (long*) x;
 }
 
@@ -41,10 +44,11 @@ long* allocate_n_help(long dim, long num_dim, long dims[]) {
   if (dim == num_dim - 1)
     return allocate1(dims[dim]);
   else {
-    long** x = malloc(8*dims[dim]);
+    long** x = malloc(8*(dims[dim]+1));
     for (int i = 0; i < dims[dim]; i++) {
-      x[i] = allocate_n_help(dim+1, num_dim, dims);
+      x[i+1] = allocate_n_help(dim+1, num_dim, dims);
     }
+    ((long*)x)[0] = dims[dim];
     return (long*) x;
   }
 }

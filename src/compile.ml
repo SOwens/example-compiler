@@ -57,10 +57,10 @@ let filename =
   | Some filename ->
     filename
 
-let ast = FrontEnd.front_end filename true;;
+let ast = FrontEnd.front_end filename false;;
 
 let (_,opt_ast) = ConstProp.prop_stmts SourceAst.Idmap.empty ast;;
- printf "@\n%a@\n" SourceAst.pp_stmts opt_ast;; 
+ (* printf "@\n%a@\n" SourceAst.pp_stmts opt_ast;; *)
 
 let no_nest_ast = UnnestExp.unnest opt_ast;;
 (* printf "@\n%a@\n" SourceAst.pp_stmts no_nest_ast;; *)
@@ -99,7 +99,7 @@ let lva_cfg3 = LiveVarAnalysis.remove_unused_writes lva_cfg2;;
 (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg3;; *)
 
 let lva_cfg4 = LiveVarAnalysis.lva (List.map fst lva_cfg3);;
-(* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;; *)
+(* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;;*)
 
 let (reg_cfg, num_stack) =
   RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst lva_cfg4);;

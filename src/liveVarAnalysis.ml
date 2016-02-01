@@ -53,8 +53,8 @@ let analyse_block (b : basic_block) : cfg_annot =
         (Varset.add i kill)
         b
     | St (i, a1, a2) :: b ->
-      analyse_block (add_gen a1 (add_gen a2 (Varset.remove i gen)))
-        (Varset.add i kill)
+      analyse_block (add_gen a1 (add_gen a2 (Varset.add i gen)))
+        kill
         b
     | In i :: b ->
       analyse_block (Varset.remove i gen) (Varset.add i kill) b
@@ -147,7 +147,7 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
       local_remove_unused_writes live b
   | St (i, a1, a2) :: b ->
     St (i, a1, a2) ::
-    local_remove_unused_writes (add_gen a1 (add_gen a2 (Varset.remove i live))) b
+    local_remove_unused_writes (add_gen a1 (add_gen a2 (Varset.add i live))) b
   | In i :: b ->
     if Varset.mem i live then
       In i :: local_remove_unused_writes (Varset.remove i live) b
