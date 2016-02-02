@@ -31,7 +31,7 @@ Basic-block transformations
 ---------------------------
 
 - _shrinkImmediates.ml_: Removes all constants that don't fit into 32 bits
-  (since that's the maximum size of an immediate on x86--64), possibly
+  (since that's the maximum size of an immediate on x86-64), possibly
   introducing assignments to temporary variables .
 - _liveVarAnalysis.ml_: Performs live variable analysis, and removes unused
   assignments.
