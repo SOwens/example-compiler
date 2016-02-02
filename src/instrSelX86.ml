@@ -54,6 +54,10 @@ let reg_numbers =
    (10, R14);
    (11, R15)]
 
+(* Assume that we have kept RAX free for scratch space *)
+let r_scratch = RAX
+let r_scratch2 = RDX
+
 (* Convert a variable, which can be a register or stack slot, to a rm *)
 let var_to_rm (v : var) : rm =
   match v with
@@ -67,7 +71,7 @@ let rm_rm_to_dest_src (dest_rm : rm) (src_rm : rm)
   | (Zr r, _) -> ([], Zr_rm (r, src_rm))
   | (_, Zr r) -> ([], Zrm_r (dest_rm, r))
   | (Zm _, Zm _) ->
-    ([Zmov (Zr_rm (RAX, src_rm))], Zrm_r (dest_rm, RAX))
+    ([Zmov (Zr_rm (r_scratch, src_rm))], Zrm_r (dest_rm, r_scratch))
 
 let rm_ae_to_dest_src (dest_rm : rm) (src_ae : atomic_exp)
   : instruction list * dest_src =
@@ -87,23 +91,23 @@ let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
          Some (List.assoc b reg_numbers),
          None))
   | (Vreg b, Ident (Stack i)) ->
-    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)))],
-     Zm (Some (1, RAX),
+    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
+     Zm (Some (1, r_scratch2),
          Some (List.assoc b reg_numbers),
          None))
   | (Stack i, Num o) ->
-    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)))],
-     Zm (None, Some RAX, Some o))
+    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
+     Zm (None, Some r_scratch2, Some o))
   | (Stack i, Ident (Vreg r)) ->
-    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)))],
+    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
      Zm (Some (1, List.assoc r reg_numbers),
-         Some RAX,
+         Some r_scratch2,
          None))
   | (Stack i, Ident (Stack j)) ->
-    ([Zmov (Zr_rm (RAX, var_to_rm (Stack i)));
-      Zmov (Zr_rm (RAX, var_to_rm (Stack j)))],
-     Zm (Some (1, RDX),
-         Some RAX,
+    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)));
+      Zbinop (Zadd, Zr_rm (r_scratch2, var_to_rm (Stack j)))],
+     Zm (None,
+         Some r_scratch2,
          None))
   | ((NamedSource _ | NamedTmp _), _) ->
     raise (Util.InternalError "Named variables in instrSelX86")
@@ -126,20 +130,17 @@ let build_to_reg_op (op : Tokens.op) (r : reg) (ae : atomic_exp)
     [Zmov (Zrm_i (Zr RDX, 0L));
      Zmov (Zr_rm (RAX, Zr r));
      Zidiv (var_to_rm v);
-     Zmov (Zr_rm (r, Zr RAX))]
+     Zmov (Zr_rm (r, Zr r_scratch))]
   | (T.Div, Num i) ->
     [Zmov (Zrm_i (Zr RDX, 0L));
      Zmov (Zr_rm (RAX, Zr r));
      Zmov (Zrm_i (Zr r, i));
      Zidiv (Zr r);
-     Zmov (Zr_rm (r, Zr RAX))]
+     Zmov (Zr_rm (r, Zr r_scratch))]
   | ((T.Lt | T.Gt | T.Eq), _) ->
     assert false
   | ((T.And | T.Or), _) ->
     assert false
-
-(* Assume that we have kept RAX free for scratch space *)
-let r_scratch = RAX
 
 let reverse_op op =
   match op with
@@ -155,8 +156,9 @@ let op_to_cond op =
   | T.Eq -> Z_E
   | _ -> assert false
 
-(* Don't save RAX, since it is our scratch. Remember to do an even number
-   before a call for alignment *)
+(* Don't save RAX since it is our scratch. Remember to do an even number before
+   a call for alignment. This is why we also push RDX, even though it is
+   scratch too. *)
 let caller_save =
   [Zpush (Zi_rm (Zr RCX));
    Zpush (Zi_rm (Zr RDX));
@@ -174,7 +176,7 @@ let caller_restore =
    Zpop (Zr R8);
    Zpop (Zr RDI);
    Zpop (Zr RSI);
-   Zpop (Zr RDX);
+   Zpush (Zi_rm (Zr RDX));
    Zpop (Zr RCX)]
 
 let reg_list = [RDI; RSI; RDX; RCX; R8; R9]
@@ -188,6 +190,7 @@ let stack_reg_to_offset r =
   | R8 -> 24L
   | _ -> assert false
 
+(* TODO rename and refactor *)
 let reg_ae_to_dest_src (overwritten_regs : reg list) dest_r ae =
   match ae with
   | Num n -> Some (Zrm_i (Zr dest_r, n))
@@ -277,7 +280,7 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     caller_save @
     [Zcall ((if underscore_labels then "_" else "") ^ "input")] @
     caller_restore @
-    [Zmov (Zrm_r (var_to_rm v, RAX))]
+    [Zmov (Zrm_r (var_to_rm v, r_scratch))]
   | Out v ->
     caller_save @
     [Zmov (Zr_rm (RDI, var_to_rm v));
@@ -293,7 +296,7 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     setup_args aes reg_list [] @
     [Zcall alloc_name] @
     caller_restore @
-    [Zmov (Zrm_r (var_to_rm v, RAX))]
+    [Zmov (Zrm_r (var_to_rm v, r_scratch))]
 
 (* Return a boolean true if the condition needs to be negated *)
 let test_to_x86 ae1 ae2 : instruction * bool =

@@ -1,6 +1,7 @@
 {
-  x := array[10]
   i := 0
+  output i
+  x := array[10]
   while i < 10 {
     x[i] := i
     i := i + 1
