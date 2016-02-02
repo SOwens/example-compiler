@@ -51,14 +51,12 @@ let rec pp_linear_list fmt ls =
     (pp_linear fmt x;
      pp_linear_list fmt y)
 
-module I =
-  Map.Make(struct type t = int let (compare : int -> int -> int) = compare end)
+module I = Util.Intmap
 
 (* Initialise the mutable visited fields to false, and put CFG into a map *)
 let init_traversal (cfg : cfg) : cfg_entry I.t =
   List.iter (fun x -> x.started <- false; x.finished <- false) cfg;
   List.fold_left (fun map x -> I.add x.bnum x map) I.empty cfg
-
 
 (* Linearise the reachable cfg, starting from the block with index next_block,
    but don't do already visited blocks *)

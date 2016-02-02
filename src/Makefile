@@ -2,7 +2,7 @@ PACKAGES = ppx_deriving.show,extlib,str,ppx_monadic,ppx_deriving.ord
 
 FILES = util tokens sourceAst typeCheck frontEnd constProp unnestExp removeBool \
 blockStructure shrinkImmediates liveVarAnalysis regAlloc lineariseCfg x86 \
-instrSelX86 interp compile pretty
+instrSelX86 astInterp blockInterp interp compile pretty
 
 FILES_ML = $(addsuffix .ml,$(FILES))
 FILES_MLI = $(addsuffix .mli,$(FILES))

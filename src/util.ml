@@ -20,6 +20,8 @@ exception BadInput of string
 exception InternalError of string
 
 module Strmap = Map.Make(String)
+module Intmap =
+  Map.Make(struct type t = int let (compare : int -> int -> int) = compare end)
 
 let count (n : int) : int list =
   let rec f n next =

@@ -16,19 +16,24 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* Flatten the CFG into a list of three-address code. *)
+(* An interpreter for ASTs *)
 
-open BlockStructure
-type linear =
-  | Instr of block_elem
-  | CJump of test * bool * string (* jump to string if var is bool *)
-  | Jump of string
-  | Label of string
-  [@@deriving show]
+(* For when the interpreter crashed, such as array bounds violations *)
+exception Crash of string
 
-type linear_list = linear list
-  [@@deriving show]
+(* For errors that a well-typed program can't have *)
+exception TypeError
 
-val cfg_to_linear : cfg -> linear list
+(* Values are either integers or n-dimensional arrays of integers.
+   We keep multi-dimensional arrays in a single dimensional one and include a
+   list of how big each dimension is.
+   We represent bools as numbers: true = 1L and false = 0L *)
+type val_t =
+  | Vint of int64
+  | Varray of int list * int64 array
 
-val init_traversal : cfg -> cfg_entry Util.Intmap.t
+type store_t = val_t SourceAst.Idmap.t
+
+val do_op : Tokens.op -> int64 -> int64 -> int64
+
+val interp_stmts : store_t -> SourceAst.stmt list -> store_t

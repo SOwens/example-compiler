@@ -16,19 +16,6 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* Flatten the CFG into a list of three-address code. *)
+(* An interpreter for CFGs *)
 
-open BlockStructure
-type linear =
-  | Instr of block_elem
-  | CJump of test * bool * string (* jump to string if var is bool *)
-  | Jump of string
-  | Label of string
-  [@@deriving show]
-
-type linear_list = linear list
-  [@@deriving show]
-
-val cfg_to_linear : cfg -> linear list
-
-val init_traversal : cfg -> cfg_entry Util.Intmap.t
+val interp_prog : int -> BlockStructure.cfg -> unit
