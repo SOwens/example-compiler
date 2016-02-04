@@ -48,7 +48,11 @@ type block_elem =
   | Ld of var * var * atomic_exp
   (* St (x,e1,e2) represents *(x+e1) := e2 *)
   | St of var * atomic_exp * atomic_exp
+  (* Call (x, f, aes) represents x := f(aes) *)
   | Call of var option * string * atomic_exp list
+  (* BoundCheck (a1, a2) represents assert (a1 >= 0 && a1 < a2) *)
+  | BoundCheck of atomic_exp * atomic_exp
+
   [@@deriving show]
 
 type basic_block = block_elem list

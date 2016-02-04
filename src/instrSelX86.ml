@@ -220,6 +220,51 @@ let rec setup_args (aes : atomic_exp list) remaining_regs overwritten_regs
     setup_args aes regs (next :: overwritten_regs)
   | _ -> raise TODO
 
+let op_to_cc b op =
+  match (b, op) with
+  | (true, Lt) ->
+    Z_L
+  | (false, Lt) ->
+    Z_NL
+  | (true, Gt) ->
+    Z_G
+  | (false, Gt) ->
+    Z_NG
+  | (true, Eq) ->
+    Z_E
+  | (false, Eq) ->
+    Z_NE
+
+let reverse_op2 op =
+  match op with
+  | Gt -> Lt
+  | Lt -> Gt
+  | Eq -> Eq
+
+(* Return a boolean true if the condition needs to be negated *)
+let test_to_x86 ae1 op ae2 b (label : string) : instruction list =
+  match (ae1, ae2) with
+  | (Ident i, _) ->
+    let (instrs, dest_src) = rm_ae_to_dest_src (var_to_rm i) ae2 in
+    instrs @
+    [Zbinop (Zcmp, dest_src);
+     Zjcc (op_to_cc b op, label)]
+  | (_, Ident i) ->
+    let (instrs, dest_src) = rm_ae_to_dest_src (var_to_rm i) ae1 in
+    [Zbinop (Zcmp, dest_src);
+     Zjcc (op_to_cc b (reverse_op2 op), label)]
+  | (Num n1, Num n2) ->
+    let do_jump =
+      match op with
+      | Gt -> (Int64.compare n1 n2 > 0) = b
+      | Lt -> (Int64.compare n1 n2 < 0) = b
+      | Eq -> (Int64.compare n1 n2 = 0) = b
+    in
+    if do_jump then
+      [Zjcc (Z_ALWAYS, label)]
+    else
+      []
+
 let rec be_to_x86 (underscore_labels : bool) be : instruction list =
   match be with
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
@@ -285,47 +330,9 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     (match v with
      | None -> []
      | Some v -> [Zmov (Zrm_r (var_to_rm v, r_scratch))])
-
-(* Return a boolean true if the condition needs to be negated *)
-let test_to_x86 ae1 ae2 : instruction * bool =
-  match (ae1, ae2) with
-  | (Ident i, Num imm) ->
-    (Zbinop (Zcmp, Zrm_i (var_to_rm i, imm)), false)
-  | (Num imm, Ident i) ->
-    (Zbinop (Zcmp, Zrm_i (var_to_rm i, imm)), true)
-  | (Ident i1, Ident i2) ->
-    (match (var_to_rm i1, var_to_rm i2) with
-     | (Zr r1, Zr r2) ->
-       (Zbinop (Zcmp, Zrm_r (Zr r1, r2)), false)
-     | (Zm _ as m, Zr r) ->
-       (Zbinop (Zcmp, Zrm_r (m, r)), false)
-     | (Zr r, (Zm _ as m)) ->
-       (Zbinop (Zcmp, Zr_rm (r, m)), false)
-     | (Zm _, Zm _) ->
-       raise TODO)
-  | (Num _, Num _) ->
-    raise (Util.InternalError "2 immediates in instrSelX86")
-
-let op_to_cc b op =
-  match (b, op) with
-  | (true, Lt) ->
-    Z_L
-  | (false, Lt) ->
-    Z_NL
-  | (true, Gt) ->
-    Z_G
-  | (false, Gt) ->
-    Z_NG
-  | (true, Eq) ->
-    Z_E
-  | (false, Eq) ->
-    Z_NE
-
-let reverse_op2 op =
-  match op with
-  | Gt -> Lt
-  | Lt -> Gt
-  | Eq -> Eq
+  | BoundCheck (a1, a2) ->
+    test_to_x86 a1 Lt (Num 0L) true "bound_error" @
+    test_to_x86 a1 Lt a2 false "bound_error"
 
 let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int)
   : instruction list =
@@ -345,9 +352,7 @@ let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int)
           match l with
           | L.Instr be -> be_to_x86 underscore_labels be
           | L.CJump ((ae1, op, ae2), b, s) ->
-            let (cmp, reverse) = test_to_x86 ae1 ae2 in
-            [cmp;
-             Zjcc (op_to_cc b (if reverse then reverse_op2 op else op), s)]
+            test_to_x86 ae1 op ae2 b s
           | L.Jump s ->
             [Zjcc (Z_ALWAYS, s)]
           | L.Label s ->

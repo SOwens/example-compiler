@@ -113,6 +113,24 @@ let shrink_imm_elem (e : block_elem) : block_elem list =
         ([], [], 2)
     in
     s @ [Call (v, f, es)]
+  | BoundCheck (a1, a2) ->
+    assert (not (is_imm a1 && is_imm a2));
+    begin
+      match get_large_imm a1 with
+      | Some n ->
+        assign_imm tmp_var n @
+        [BoundCheck (Ident tmp_var, a2)]
+      | None ->
+        begin
+          match get_large_imm a2 with
+          | Some n ->
+            assign_imm tmp_var n @
+            [BoundCheck (a1, Ident tmp_var)]
+          | None ->
+            [e]
+        end
+    end
+
 
 let shrink_imm (cfg : cfg) : cfg =
   List.map

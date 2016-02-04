@@ -75,7 +75,10 @@ type block_elem =
   | Ld of var * var * atomic_exp
   (* St (x,e1,e2) represents *(x+e1) := e2 *)
   | St of var * atomic_exp * atomic_exp
+  (* Call (x, f, aes) represents x := f(aes) *)
   | Call of var option * string * atomic_exp list
+  (* BoundCheck (a1, a2) represents assert (a1 >= 0 && a1 < a2) *)
+  | BoundCheck of atomic_exp * atomic_exp
   [@@deriving show]
 
 let pp_block_elem fmt be =
@@ -109,6 +112,11 @@ let pp_block_elem fmt be =
     Format.fprintf fmt "%s%a"
       x
       (pp_list pp_atomic_exp) aes
+  | BoundCheck (a1, a2) ->
+    Format.fprintf fmt "assert (%a >= 0 && %a < %a)"
+      pp_atomic_exp a1
+      pp_atomic_exp a1
+      pp_atomic_exp a2
 
 type basic_block = block_elem list
   [@@deriving show]
@@ -199,14 +207,16 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
                        assert ae < length_var;
                        v := *(id + (ae+1) * 8) *)
     let get_len = Ld (tmp_var, id_to_var id, Num 0L) in
-    (* TODO assert ae < tmp_var *)
     (match ae with
      | Num n ->
-       [Ld (v, id_to_var id, Num (Int64.shift_left (Int64.add n 1L) 3)); get_len]
+       [Ld (v, id_to_var id, Num (Int64.shift_left (Int64.add n 1L) 3));
+        BoundCheck (ae, Ident tmp_var);
+        get_len]
      | _ ->
        [Ld (v, id_to_var id, Ident tmp_var);
         AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
         AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+        BoundCheck (ae, Ident tmp_var);
         get_len])
   | S.Ident (id, _::_::_) ->
     raise (InternalError "multi-dimension array index in blockStructure")
@@ -217,7 +227,8 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
   | S.Uop (Tokens.Not, ae) ->
     raise (InternalError "not in blockStructure")
   | S.Array es ->
-    [Call (Some v, "allocate" ^ string_of_int (List.length es), List.map exp_to_atomic es)]
+    [Call (Some v, "allocate" ^ string_of_int (List.length es),
+           List.map exp_to_atomic es)]
 
 let op_to_test_op op =
   match op with
@@ -282,16 +293,18 @@ let build_cfg (stmts : S.stmt list) : cfg =
                         assert ae < length_var;
                         *(x + (ae+1) * 8) := e *)
       let get_len = Ld (tmp_var, id_to_var x, Num 0L) in
-      (* TODO assert ae < tmp_var *)
       let new_block_elems =
         (match ae with
          | Num n ->
-           [St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3), exp_to_atomic e);
+           [St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3),
+                exp_to_atomic e);
+            BoundCheck (ae, Ident tmp_var);
             get_len]
          | _ ->
            [St (id_to_var x, Ident tmp_var, exp_to_atomic e);
             AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
             AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
+            BoundCheck (ae, Ident tmp_var);
             get_len])
       in
       find_blocks block_num (new_block_elems @ block_acc) ret_block s1
@@ -331,9 +344,11 @@ let build_cfg (stmts : S.stmt list) : cfg =
         find_blocks false_block_n [] (Next following_block_n) [s2];
         find_blocks following_block_n [] ret_block s3
     | S.In x :: s ->
-      find_blocks block_num (Call (Some (id_to_var x),"input", []) :: block_acc) ret_block s
+      find_blocks block_num (Call (Some (id_to_var x),"input", []) :: block_acc)
+        ret_block s
     | S.Out x :: s ->
-      find_blocks block_num (Call (None, "output", [Ident (id_to_var x)]) :: block_acc) ret_block s
+      find_blocks block_num 
+        (Call (None, "output", [Ident (id_to_var x)]) :: block_acc) ret_block s
     | ((S.Loc _) :: _) ->
       raise (InternalError "Loc in blockStructure")
   in

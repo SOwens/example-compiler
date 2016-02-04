@@ -128,6 +128,11 @@ let count_vars_be (be : block_elem) : unit M.t =
     M.inc_var i;
     mapM_ count_vars_ae aes;
     return ()
+  | BoundCheck (a1, a2) ->
+    M.do_ ;
+    count_vars_ae a1;
+    count_vars_ae a2;
+    return ()
 
 let count_vars_test (ae1, op, ae2) : unit M.t =
   let vars =
@@ -182,6 +187,9 @@ let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
   | Call (v, f, aes) ->
     Call (Util.option_map (fun v -> Varmap.find v map) v, f,
           List.map (reg_alloc_ae map) aes)
+  | BoundCheck (a1, a2) ->
+    BoundCheck (reg_alloc_ae map a1, reg_alloc_ae map a2)
+
 
 let reg_alloc_test (map : var Varmap.t) (ae1, op, ae2) : test =
   (reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)
