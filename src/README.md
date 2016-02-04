@@ -1,7 +1,7 @@
 Compiler structure
 ------------------
 
-The top-level files are _compile.ml_ and _interp.ml_, driving a comiler and
+The top-level files are _compile.ml_ and _interp.ml_, driving a compiler and
 interpreter respectively.
 
 Front end
@@ -32,17 +32,17 @@ Basic-block transformations
 
 - _shrinkImmediates.ml_: Removes all constants that don't fit into 32 bits
   (since that's the maximum size of an immediate on x86-64), possibly
-  introducing assignments to temporary variables .
+  introducing assignments to temporary variables.
 - _liveVarAnalysis.ml_: Performs live variable analysis, and removes unused
   assignments.
 - _regAlloc.ml_: Perform register allocation. This changes all identifiers from
   named variables to registers and stack offsets.
-- _linearistCFG.ml_: Flatten the CFG, introducing labels and branches.
+- _lineariseCFG.ml_: Flatten the CFG, introducing labels and branches.
 
-Backend
+Back end
 -------
 - _x86.ml_: An AST for the small subset of x86-64 that the compiler generates.
-  Incudes a printer for it in NASM syntax.
+  Includes a printer for it in NASM syntax.
 - _instrSelX86.ml_: Generate x86 code.
 
 Misc
