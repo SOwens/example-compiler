@@ -276,27 +276,15 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     instrs @
     instrs2 @
     [Zmov dest_src]
-  | In v ->
-    caller_save @
-    [Zcall ((if underscore_labels then "_" else "") ^ "input")] @
-    caller_restore @
-    [Zmov (Zrm_r (var_to_rm v, r_scratch))]
-  | Out v ->
-    caller_save @
-    [Zmov (Zr_rm (RDI, var_to_rm v));
-     Zcall ((if underscore_labels then "_" else "") ^ "output")] @
-    caller_restore
-  | Alloc (v, aes) ->
-    let alloc_name =
-      (if underscore_labels then "_" else "") ^
-      "allocate" ^
-      string_of_int (List.length aes)
-    in
+  | Call (v, f, aes) ->
+    let alloc_name = (if underscore_labels then "_" else "") ^ f in
     caller_save @
     setup_args aes reg_list [] @
     [Zcall alloc_name] @
     caller_restore @
-    [Zmov (Zrm_r (var_to_rm v, r_scratch))]
+    (match v with
+     | None -> []
+     | Some v -> [Zmov (Zrm_r (var_to_rm v, r_scratch))])
 
 (* Return a boolean true if the condition needs to be negated *)
 let test_to_x86 ae1 ae2 : instruction * bool =

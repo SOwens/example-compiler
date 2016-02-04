@@ -101,9 +101,7 @@ let shrink_imm_elem (e : block_elem) : block_elem list =
         assign_imm tmp_var2 n2 @
         [St(r, Ident tmp_var, Ident tmp_var2)]
     end
-  | In r -> [e]
-  | Out r -> [e]
-  | Alloc (v, aes) ->
+  | Call (v, f, aes) ->
     let (s, es, _) =
       List.fold_right
         (fun (ae : atomic_exp) ((s : block_elem list), es, n) ->
@@ -114,8 +112,7 @@ let shrink_imm_elem (e : block_elem) : block_elem list =
         aes
         ([], [], 2)
     in
-    s @ [Alloc (v, es)]
-
+    s @ [Call (v, f, es)]
 
 let shrink_imm (cfg : cfg) : cfg =
   List.map

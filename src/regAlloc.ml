@@ -119,20 +119,15 @@ let count_vars_be (be : block_elem) : unit M.t =
     count_vars_ae ae1;
     count_vars_ae ae2;
     return ()
-  | In r ->
+  | Call (None, f, aes) ->
     M.do_ ;
-    M.inc_var r;
+    mapM_ count_vars_ae aes;
     return ()
-  | Out r ->
-    M.do_ ;
-    M.inc_var r;
-    return ()
-  | Alloc (i, aes) ->
+  | Call (Some i, f, aes) ->
     M.do_ ;
     M.inc_var i;
     mapM_ count_vars_ae aes;
     return ()
-
 
 let count_vars_test (ae1, op, ae2) : unit M.t =
   let vars =
@@ -184,12 +179,9 @@ let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
     Ld (Varmap.find v1 map, Varmap.find v2 map, reg_alloc_ae map ae)
   | St (v, ae1, ae2) ->
     St (Varmap.find v map, reg_alloc_ae map ae1, reg_alloc_ae map ae2)
-  | In v ->
-    In (Varmap.find v map)
-  | Out v ->
-    Out (Varmap.find v map)
-  | Alloc (v, aes) ->
-    Alloc (Varmap.find v map, List.map (reg_alloc_ae map) aes)
+  | Call (v, f, aes) ->
+    Call (Util.option_map (fun v -> Varmap.find v map) v, f,
+          List.map (reg_alloc_ae map) aes)
 
 let reg_alloc_test (map : var Varmap.t) (ae1, op, ae2) : test =
   (reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)

@@ -101,21 +101,26 @@ let interp_block_elem (store : store_t) (heap : heap_t) (be : block_elem)
     let n3 = interp_atomic_exp store ae2 in
     int64_to_bytes heap.heap (Int64.to_int (Int64.add n1 n2)) n3;
     store
-  | In x ->
+  | Call (Some x, "input", []) ->
     Printf.printf "> ";
     (try
        let n = Int64.of_string (read_line ()) in
        Varmap.add x n store
      with Failure _ -> raise (Crash "not a 64-bit integer"))
-  | Out i ->
+  | Call (None, "output", [i]) ->
     begin
-      print_string (Int64.to_string (Varmap.find i store));
+      print_string (Int64.to_string (interp_atomic_exp store i));
       print_newline ();
       store
     end
-  | Alloc (x, aes) ->
+  | Call (Some x,
+          ("allocate1" | "allocate2" | "allocate3" | "allocate4" | "allocate5" |
+           "allocate6" | "allocate7"),
+          aes) ->
     let ns = List.map (interp_atomic_exp store) aes in
     Varmap.add x (alloc heap ns) store
+  | Call _ ->
+    raise (Util.InternalError "Unknown function call in blockInterp")
 
 let rec interp_basic_block (store : store_t) (heap : heap_t)
     (bb : basic_block) : store_t =

@@ -48,9 +48,7 @@ type block_elem =
   | Ld of var * var * atomic_exp
   (* St (x,e1,e2) represents *(x+e1) := e2 *)
   | St of var * atomic_exp * atomic_exp
-  | In of var
-  | Out of var
-  | Alloc of var * atomic_exp list
+  | Call of var option * string * atomic_exp list
   [@@deriving show]
 
 type basic_block = block_elem list

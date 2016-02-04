@@ -56,11 +56,9 @@ let analyse_block (b : basic_block) : cfg_annot =
       analyse_block (add_gen a1 (add_gen a2 (Varset.add i gen)))
         kill
         b
-    | In i :: b ->
-      analyse_block (Varset.remove i gen) (Varset.add i kill) b
-    | Out i :: b ->
-      analyse_block (Varset.add i gen) kill b
-    | Alloc (i, aes) :: b ->
+    | Call (None, f, aes) :: b ->
+      analyse_block (add_gen_list aes gen) kill b
+    | Call (Some i, f, aes) :: b ->
       analyse_block (add_gen_list aes (Varset.remove i gen)) (Varset.add i kill) b
   in
   let (gen,kill) = analyse_block Varset.empty Varset.empty (List.rev b) in
@@ -148,16 +146,14 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
   | St (i, a1, a2) :: b ->
     St (i, a1, a2) ::
     local_remove_unused_writes (add_gen a1 (add_gen a2 (Varset.add i live))) b
-  | In i :: b ->
-    if Varset.mem i live then
-      In i :: local_remove_unused_writes (Varset.remove i live) b
-    else
-      local_remove_unused_writes live b
-  | Out i :: b ->
-    Out i :: local_remove_unused_writes (Varset.add i live) b
-  | Alloc (i, aes) :: b ->
-    Alloc (i, aes) ::
-    local_remove_unused_writes (add_gen_list aes (Varset.remove i live)) b
+  | Call (i, f, aes) :: b ->
+    Call (i, f, aes) ::
+    let live' =
+      match i with
+      | None -> live
+      | Some v -> Varset.remove v live
+    in
+    local_remove_unused_writes (add_gen_list aes live') b
 
 let add_test_vars (ae1, op, ae2) vars =
   let vars' =

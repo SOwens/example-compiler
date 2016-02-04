@@ -75,9 +75,7 @@ type block_elem =
   | Ld of var * var * atomic_exp
   (* St (x,e1,e2) represents *(x+e1) := e2 *)
   | St of var * atomic_exp * atomic_exp
-  | In of var
-  | Out of var
-  | Alloc of var * atomic_exp list
+  | Call of var option * string * atomic_exp list
   [@@deriving show]
 
 let pp_block_elem fmt be =
@@ -102,16 +100,15 @@ let pp_block_elem fmt be =
       pp_var v
       pp_atomic_exp ae1
       pp_atomic_exp ae2
-  | In v ->
-    Format.fprintf fmt "input %a"
+  | Call (Some v, x, aes) ->
+    Format.fprintf fmt "%a := %s%a"
       pp_var v
-  | Out v ->
-    Format.fprintf fmt "output %a"
-      pp_var v
-  | Alloc (v, vs) ->
-    Format.fprintf fmt "%a := alloc%a"
-      pp_var v
-      (pp_list pp_atomic_exp) vs
+      x
+      (pp_list pp_atomic_exp) aes
+  | Call (None, x, aes) ->
+    Format.fprintf fmt "%s%a"
+      x
+      (pp_list pp_atomic_exp) aes
 
 type basic_block = block_elem list
   [@@deriving show]
@@ -220,7 +217,7 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
   | S.Uop (Tokens.Not, ae) ->
     raise (InternalError "not in blockStructure")
   | S.Array es ->
-    [Alloc (v, List.map exp_to_atomic es)]
+    [Call (Some v, "allocate" ^ string_of_int (List.length es), List.map exp_to_atomic es)]
 
 let op_to_test_op op =
   match op with
@@ -334,9 +331,9 @@ let build_cfg (stmts : S.stmt list) : cfg =
         find_blocks false_block_n [] (Next following_block_n) [s2];
         find_blocks following_block_n [] ret_block s3
     | S.In x :: s ->
-      find_blocks block_num (In (id_to_var x) :: block_acc) ret_block s
+      find_blocks block_num (Call (Some (id_to_var x),"input", []) :: block_acc) ret_block s
     | S.Out x :: s ->
-      find_blocks block_num (Out (id_to_var x) :: block_acc) ret_block s
+      find_blocks block_num (Call (None, "output", [Ident (id_to_var x)]) :: block_acc) ret_block s
     | ((S.Loc _) :: _) ->
       raise (InternalError "Loc in blockStructure")
   in
