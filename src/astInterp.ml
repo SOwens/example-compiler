@@ -197,8 +197,7 @@ let rec interp_stmt (store : store_t) (s : stmt) : store_t =
       print_newline ();
       store
     end
-  | Loc _ ->
-    raise (InternalError "Location annotation in interp")
+  | Loc (s, _) -> interp_stmt store s
 
 and interp_stmts (store : store_t) (sl : stmt list) : store_t = match sl with
   | [] -> store

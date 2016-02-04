@@ -347,10 +347,10 @@ let build_cfg (stmts : S.stmt list) : cfg =
       find_blocks block_num (Call (Some (id_to_var x),"input", []) :: block_acc)
         ret_block s
     | S.Out x :: s ->
-      find_blocks block_num 
+      find_blocks block_num
         (Call (None, "output", [Ident (id_to_var x)]) :: block_acc) ret_block s
-    | ((S.Loc _) :: _) ->
-      raise (InternalError "Loc in blockStructure")
+    | ((S.Loc (s1, _)) :: s2) ->
+      find_blocks block_num block_acc ret_block (s1::s2)
   in
 
   let end_block_num = get_block_num () in

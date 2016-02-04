@@ -18,7 +18,7 @@
 
 (* Convert linearised three-address code to x86-64 *)
 
-exception TODO
+exception TODO of string
 
 open BlockStructure
 open X86
@@ -156,9 +156,11 @@ let op_to_cond op =
   | T.Eq -> Z_E
   | _ -> assert false
 
+(* ------------ Calling convention stuff ------------ *)
+
 (* Don't save RAX since it is our scratch. Remember to do an even number before
-   a call for alignment. This is why we also push RDX, even though it is
-   scratch too. *)
+   a call for alignment, which must be 16-bytes at (external) function calls.
+   This is why we also push RDX, even though it is scratch too. *)
 let caller_save =
   [Zpush (Zi_rm (Zr RCX));
    Zpush (Zi_rm (Zr RDX));
@@ -176,11 +178,14 @@ let caller_restore =
    Zpop (Zr R8);
    Zpop (Zr RDI);
    Zpop (Zr RSI);
-   Zpush (Zi_rm (Zr RDX));
+   Zpop (Zr RDX);
    Zpop (Zr RCX)]
 
+(* The order that the calling convention puts arguments into registers *)
 let reg_list = [RDI; RSI; RDX; RCX; R8; R9]
 
+(* Where the saved versions of the argument registers are on the stack. Depends
+   on the order in caller_save. This is relative to RSP. *)
 let stack_reg_to_offset r =
   match r with
   | RDI -> 32L
@@ -190,8 +195,12 @@ let stack_reg_to_offset r =
   | R8 -> 24L
   | _ -> assert false
 
-(* TODO rename and refactor *)
-let reg_ae_to_dest_src (overwritten_regs : reg list) dest_r ae =
+(* Move the value of ae into the register dest_r for argument passing. If ae
+   refers to any regs in overwritten_regs, which contains the registers
+   overwitten already for previous arguments, then use the stored version on
+   the stack. *)
+let setup_arg (overwritten_regs : reg list) (dest_r : reg) (ae : atomic_exp)
+  : dest_src option =
   match ae with
   | Num n -> Some (Zrm_i (Zr dest_r, n))
   | Ident (Stack i) -> Some (Zr_rm (dest_r, var_to_rm (Stack i)))
@@ -207,18 +216,24 @@ let reg_ae_to_dest_src (overwritten_regs : reg list) dest_r ae =
   | Ident (NamedSource _ | NamedTmp _) ->
     raise (Util.InternalError "Named variable in instrSelX86")
 
-let rec setup_args (aes : atomic_exp list) remaining_regs overwritten_regs
-  : instruction list =
+(* Move the values of aes into the registers and then the stack for argument
+   passing. If ae refers to any regs in overwritten_regs, which contains the
+   registers overwitten already for previous arguments, then use the stored
+   version on the stack. *)
+let rec setup_args (aes : atomic_exp list) (remaining_regs : reg list)
+    (overwritten_regs : reg list) : instruction list =
   match (aes, remaining_regs) with
   | ([], _) -> []
   | (a :: aes, next :: regs) ->
-    (match reg_ae_to_dest_src overwritten_regs next a with
-     | None ->
-       []
-     | Some arg ->
-       [Zmov arg]) @
+    (match setup_arg overwritten_regs next a with
+     | None -> []
+     | Some arg -> [Zmov arg])
+    @
     setup_args aes regs (next :: overwritten_regs)
-  | _ -> raise TODO
+  | _ ->
+    raise (TODO "InstrSelX86 does not support function calls with more than 6 arguments")
+
+(* --------------- End calling convention ------------- *)
 
 let op_to_cc b op =
   match (b, op) with
