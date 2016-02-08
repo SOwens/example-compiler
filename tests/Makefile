@@ -1,6 +1,6 @@
 # For OS X
- FORMAT = macho64
- OPTIONS = -osx
+# FORMAT = macho64
+# OPTIONS = -osx
 
 # For Linux
 # FORMAT = elf64
