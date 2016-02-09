@@ -225,7 +225,8 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
   | S.Op (ae1, op, ae2) ->
     [AssignOp (v, exp_to_atomic ae1, op, exp_to_atomic ae2)]
   | S.Uop (Tokens.Not, ae) ->
-    raise (InternalError "not in blockStructure")
+    (* !x == (x = false) *)
+    [AssignOp (v, exp_to_atomic ae, Tokens.Eq, Num 0L)]
   | S.Array es ->
     [Call (Some v, "allocate" ^ string_of_int (List.length es),
            List.map exp_to_atomic es)]
@@ -250,7 +251,8 @@ let flat_exp_to_test (e : S.exp) : test =
   | S.Op (ae1, op, ae2) ->
     (exp_to_atomic ae1, op_to_test_op op, exp_to_atomic ae2)
   | S.Uop (Tokens.Not, ae) ->
-    raise (InternalError "! in blockStructure")
+    (* !x == (x = false) *)
+    (exp_to_atomic ae, Eq, Num 0L)
   | S.Array es ->
     raise (InternalError "array alloc test in blockStructure")
 
