@@ -20,7 +20,8 @@ To compile the compiler run `make` in the `src` directory. This should produce
 `compile.byte` and `interp.byte` executables.  Both take a single command-line
 argument: a source file name with the `.expl` extension. `interp.byte` runs the
 file, `compile.byte` compiles it, generating an x86-46 assembly `.s` file in
-*nasm* syntax.
+*nasm* syntax. The compiler has an optional argument `-osx` to generate OS X
+compatible assembly. Otherwise it generates Linux compatible assembly.
 
 Compiling target programs
 -------------------------
@@ -31,6 +32,9 @@ library (using gcc).
 Use `nasm -f macho64 FILENAME.s` to assemble the compiler's output for
 *FILENAME*, and then `gcc COMPILER_DIR/runtime/io.o FILENAME.o -o FILENAME`
 to link the program with the runtime library.
+
+See the `tests` directory for some example programs. NB, the `Makefile` in that
+directory must be edited to specialise it for either OS X or Linux.
 
 The source language
 -------------------
