@@ -16,18 +16,28 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/* Trivial I/O runtime library */
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <inttypes.h>
 
-long input() {
-  long i;
+// Read in a 64 bit signed integer and return it. First print a > as prompt.
+int64_t input() {
+  int64_t i;
   printf("> ");
   fflush(stdout);
-  scanf("%ld", &i);
+  scanf("%" PRId64, &i);
+  if (errno == ERANGE) {
+    printf("Input number does not fit in a 64-bit signed integer\n");
+    exit(1);
+  }
   return i;
 }
 
-void output(long i) {
-  printf("%ld\n", i);
+// Print a given 64-bt
+void output(int64_t i) {
+  printf("%" PRId64 "\n", i);
   return;
 }
