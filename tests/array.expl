@@ -1,3 +1,4 @@
+// Basic testing of arrays
 {
   i := 0
   output i

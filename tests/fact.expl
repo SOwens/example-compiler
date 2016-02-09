@@ -1,3 +1,4 @@
+// Input a number and print its factorial
 {
   c:=1
   input x
