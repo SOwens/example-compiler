@@ -9,3 +9,6 @@ tests/*.o
 tests/*.exe
 
 runtime/*.o
+
+# Vim temporary files
+.*.swp

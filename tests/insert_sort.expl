@@ -1,0 +1,29 @@
+{
+  input len
+  a := array[len]
+  i := 0
+  while i < len {
+    input y
+    a[i] := y
+    i := i + 1
+  }
+
+  i := 1
+  while i < len {
+    y := a[i]
+    j := i - 1
+    while (!(j < 0) && (a[j] > y)) {
+      a[j+1] := a[j]
+      j := j - 1
+    }
+    a[j+1] := y
+    i := i + 1
+  }
+
+  i := 0
+  while i < len {
+    y := a[i]
+    output y
+    i := i + 1
+  }
+}

@@ -7,7 +7,7 @@ OPTIONS = -osx
 # OPTIONS = -linux
 
 COMPILER = ../src/compile.byte
-EXEC_FILES = fact.exe array.exe
+EXEC_FILES = fact.exe array.exe insert_sort.exe
 
 .PHONY : all clean
 
