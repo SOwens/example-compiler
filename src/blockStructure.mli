@@ -83,3 +83,5 @@ type cfg = cfg_entry list
   [@@deriving show]
 
 val build_cfg : SourceAst.stmt list -> cfg
+
+val cfg_to_graphviz : Format.formatter -> cfg -> unit

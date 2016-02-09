@@ -67,6 +67,12 @@ let no_nest_ast = UnnestExp.unnest opt_ast;;
 
 let cfg = BlockStructure.build_cfg no_nest_ast;;
 (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg;; *)
+(*
+let outfile = open_out (Filename.chop_extension filename ^ ".dot") in
+let fmt = formatter_of_out_channel outfile in
+fprintf fmt "%a" BlockStructure.cfg_to_graphviz cfg;
+close_out outfile;;
+   *)
 
 let cfg' = ShrinkImmediates.shrink_imm cfg;;
 (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg';; *)

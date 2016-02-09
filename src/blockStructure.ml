@@ -177,6 +177,36 @@ let pp_cfg_entry fmt e =
 type cfg = cfg_entry list
   [@@deriving show]
 
+let cfg_to_graphviz fmt (cfg : cfg) : unit =
+  Format.fprintf fmt "digraph {@\n%a@\n}"
+    (fun fmt cfg ->
+       List.iter
+         (fun entry ->
+            Format.fprintf fmt "%d[shape=box][label=\"%a\"]"
+              entry.bnum
+              (fun fmt e ->
+                 if entry.bnum = 0 then
+                   Format.fprintf fmt "EXIT@\n"
+                 else if entry.bnum = 1 then
+                   Format.fprintf fmt "ENTRY@\n"
+                 else
+                   ();
+                 List.iter (fun x -> pp_block_elem fmt x; Format.fprintf fmt "@\n")
+                   e.elems;
+                 match e.next with
+                 | Branch (t,_,_) -> pp_test fmt t
+                 | _ -> ())
+              entry;
+            match entry.next with
+            | End -> ()
+            | Next i ->
+              Format.fprintf fmt "%d->%d@\n" entry.bnum i
+            | Branch (t, i1, i2) ->
+              Format.fprintf fmt "%d->%d[label=1]@\n" entry.bnum i1;
+              Format.fprintf fmt "%d->%d[label=0]@\n" entry.bnum i2)
+         cfg)
+    cfg
+
 let id_to_var (i : S.id) : var =
   match i with
   | S.Source s -> NamedSource s
