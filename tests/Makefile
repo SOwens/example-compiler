@@ -19,6 +19,8 @@ all : $(EXEC_FILES)
 %.o : %.s
 	nasm -f $(FORMAT) $<
 
+%.o : %.c
+
 # Use gcc to do the linking since we want to include libc, and our
 # object code starts from  a C-style main function. We do not want to
 # enter at _start (which is where the OS dumps you on process

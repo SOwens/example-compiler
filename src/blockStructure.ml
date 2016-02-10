@@ -34,7 +34,7 @@ let show_var v =
   | Vreg i -> "r" ^ string_of_int i
   | Stack i -> "s" ^ string_of_int i
   | NamedSource s -> s
-  | NamedTmp (s, i) -> "_tmp_" ^ s ^ string_of_int i
+  | NamedTmp (s, i) -> "_" ^ s ^ string_of_int i
 
 let pp_var fmt v =
   Format.fprintf fmt "%s" (show_var v)
@@ -79,7 +79,6 @@ type block_elem =
   | Call of var option * string * atomic_exp list
   (* BoundCheck (a1, a2) represents assert (a1 >= 0 && a1 < a2) *)
   | BoundCheck of atomic_exp * atomic_exp
-  [@@deriving show]
 
 let pp_block_elem fmt be =
   match be with
@@ -117,6 +116,10 @@ let pp_block_elem fmt be =
       pp_atomic_exp a1
       pp_atomic_exp a1
       pp_atomic_exp a2
+
+let show_block_elem be =
+  pp_block_elem Format.str_formatter be;
+  Format.flush_str_formatter ()
 
 type basic_block = block_elem list
   [@@deriving show]
@@ -178,25 +181,26 @@ type cfg = cfg_entry list
   [@@deriving show]
 
 let cfg_to_graphviz fmt (cfg : cfg) : unit =
-  Format.fprintf fmt "digraph {@\n%a@\n}"
+  Format.fprintf fmt "digraph {@\nnode[shape=box]@\n%a@\n}"
     (fun fmt cfg ->
        List.iter
          (fun entry ->
-            Format.fprintf fmt "%d[shape=box][label=\"%a\"]"
+            Format.fprintf fmt "%d[label=\"%a\"]"
               entry.bnum
               (fun fmt e ->
                  if entry.bnum = 0 then
-                   Format.fprintf fmt "EXIT@\n"
+                   Format.fprintf fmt "EXIT\\l"
                  else if entry.bnum = 1 then
-                   Format.fprintf fmt "ENTRY@\n"
+                   Format.fprintf fmt "ENTRY\\l"
                  else
                    ();
-                 List.iter (fun x -> pp_block_elem fmt x; Format.fprintf fmt "@\n")
+                 List.iter (fun x -> Format.fprintf fmt "%s\\l" (show_block_elem x))
                    e.elems;
                  match e.next with
-                 | Branch (t,_,_) -> pp_test fmt t
+                 | Branch (t,_,_) -> Format.fprintf fmt "%a\\l" pp_test t
                  | _ -> ())
               entry;
+            Format.fprintf fmt "@\n";
             match entry.next with
             | End -> ()
             | Next i ->
