@@ -67,6 +67,8 @@ let no_nest_ast = UnnestExp.unnest opt_ast;;
 
 let cfg = BlockStructure.build_cfg no_nest_ast;;
 (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg;; *)
+(* Print the CFG in dot format. Process the .dot file with dot -Tpdf FILENAME > FILENAME.pdf.
+   dot is part of the graphviz package http://www.graphviz.org *)
 (*
 let outfile = open_out (Filename.chop_extension filename ^ ".dot") in
 let fmt = formatter_of_out_channel outfile in
