@@ -104,3 +104,34 @@ stmts ::=
 | stmt stmts
 
 A program is just a stmts.
+
+Loading the compiler in utop
+----------------------------
+
+First build the compiler, by running make from the src directory. Then load the
+packages that the compiler uses with the `#require` command:
+
+```
+#require "ppx_deriving";;
+#require "extlib";;
+#require "str";;
+```
+
+You can add these 3 lines to the `.ocamlinit` file in your home directory, so
+that you don't have to manually enter them each time you start a new utop
+session. The contents of `.ocamlinit` are run each time you start a new utop.
+
+The OCaml compilation manager stores all of the compiled OCaml sources in the
+`_build` directory, with the extension `.cmo`. The following tells utop to look
+there for source files.
+```
+#directory "_build";;
+```
+
+To load a particular module, for example, LineariseCfg, use the `#load_rec` command.
+```
+#load_rec "lineariseCfg.cmo";;
+```
+
+Often a good way to work on a file is to `#load_rec` all of the modules that it
+depends on, and then `#use` the file.
