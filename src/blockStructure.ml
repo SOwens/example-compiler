@@ -62,7 +62,7 @@ type atomic_exp =
 let show_atomic_exp ae =
   match ae with
   | Ident v -> show_var v
-  | Num i -> [%show: int64] i
+  | Num i -> Int64.to_string i
 
 let pp_atomic_exp fmt ae =
   Format.fprintf fmt "%s" (show_atomic_exp ae)
