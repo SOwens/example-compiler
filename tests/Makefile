@@ -13,7 +13,7 @@ EXEC_FILES = fact.exe array.exe insert_sort.exe
 
 all : $(EXEC_FILES)
 
-%.s : %.expl $(COMPILER)
+%.s %.dot : %.expl $(COMPILER)
 	$(COMPILER) $(OPTIONS) $<
 
 %.o : %.s
@@ -29,7 +29,10 @@ all : $(EXEC_FILES)
 %.exe : %.o ../runtime/io.o ../runtime/array.o
 	gcc ../runtime/io.o ../runtime/array.o $< -o $@
 
+%.pdf : %.dot
+	dot -Tpdf $< > $@
+
 .PRECIOUS : %.s
 
 clean :
-	rm -f *.o *.s $(EXEC_FILES)
+	rm -f *.o *.s $(EXEC_FILES) *.pdf *.dot
