@@ -23,6 +23,7 @@
  * Linux C compilers. */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <assert.h>
 
 /* Since the first element of an array will have a different type than the
