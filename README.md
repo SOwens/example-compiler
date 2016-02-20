@@ -113,6 +113,8 @@ packages that the compiler uses with the `#require` command:
 
 ```
 #require "ppx_deriving";;
+#require "ppx_deriving.ord";;
+#require "ppx_deriving.show";;
 #require "extlib";;
 #require "str";;
 ```
