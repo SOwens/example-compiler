@@ -1,0 +1,5 @@
+{
+  input x
+  y := 10 / x
+  output y
+}

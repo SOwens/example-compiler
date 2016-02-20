@@ -127,7 +127,7 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
   match elems with
   | [] -> []
   | AssignOp (i, a1, op, a2) :: b ->
-    if Varset.mem i live && pure_op op then
+    if Varset.mem i live || not (pure_op op) then
       AssignOp (i, a1, op, a2) ::
       local_remove_unused_writes
         (add_gen a1 (add_gen a2 (Varset.remove i live))) b
