@@ -81,12 +81,16 @@ let rec find_preds n cfg =
 
 (* Do live variable analysis, returning an annotated cfg *)
 let lva (cfg : BlockStructure.cfg) : cfg =
-  (* Initial annotations for all of the blocks *)
+  (* Initial annotations for all of the blocks. Live_exit = {} *)
   let init_worklist =
     List.map (fun entry -> (entry, analyse_block entry.elems)) cfg
   in
-  (* The worklist and finished_list partition the whole cfg. That is, they must
-     contain all of the blocks between them, with no duplication *)
+  (* Update one block from the worklist.
+    The worklist and finished_list partition the whole cfg. That is, they must
+     contain all of the blocks between them, with no duplication. NB, this is
+     slightly different than the naive worklist algorithm. Here we add a
+     node to the worklist only when its live_exit would change based on the current
+     nodes live_entry. *)
   let rec do_one (worklist :cfg) (finished_list :cfg) : cfg =
     match worklist with
     | [] -> finished_list
@@ -94,15 +98,26 @@ let lva (cfg : BlockStructure.cfg) : cfg =
       let live_entry =
         Varset.union annot.gen (Varset.diff annot.live_exit annot.kill)
       in
+      (* Updates contains node's predecessors from the worklist input,
+         and worklist contains the remaining non-predecessors. *)
       let (updates, worklist) = find_preds entry.bnum worklist in
+      (* Possible_updates contains node's predecessors from the finished_list,
+         possibly including itself, and finished contains the remaining
+         non-predecessors. *)
       let (possible_updates, finished) =
         find_preds entry.bnum (node::finished_list)
       in
+      (* Finished' contains all possible_updates whose live_exits are subsets
+         of our live entry. There is no need to update them, because no nodes would
+         be added to their live_exit. updates' contains those previously finished nodes
+         whose live_exits will change *)
       let (finished', updates') =
         List.partition
           (fun (entry, annot) -> Varset.subset live_entry annot.live_exit)
           possible_updates
       in
+      (* Update the live_exits of the nodes needing updated and add them to the
+         worklist *)
       let new_worklist =
         List.map
           (fun (entry, annot) ->
