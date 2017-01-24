@@ -95,8 +95,10 @@ let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
      | (e, T.Times, Num 1L) | (Num 1L, T.Times, e) -> e
      | (Num -1L, T.Times, e) | (e, T.Times, Num -1L) ->
         Op (Num 0L, T.Minus, e)
-     | (Num 0L, T.Times, e) | (e, T.Times, Num 0L)
-       when not (might_have_effect e) ->
+     (* Can't use or-patterns for the following two, according to compiler warning *)
+     | (Num 0L, T.Times, e) when not (might_have_effect e) ->
+         Num 0L
+     | (e, T.Times, Num 0L) when not (might_have_effect e) ->
          Num 0L
      | (e, T.Times, Num n) | (Num n, T.Times, e) ->
        (match log2 (Int64.abs n) with
@@ -138,7 +140,9 @@ let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
      (* Bitwise or *)
      | (Num n1, T.BitOr, Num n2) -> Num (Int64.logor n1 n2)
      | (Num 0L, T.BitOr, e) | (e, T.BitOr, Num 0L) -> e
-     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitOr, e)
+     (* Can't use or-patterns for the following two, according to compiler warning *)
+     | (Num 0xFFFFFFFFFFFFFFFFL, T.BitOr, e) when not (might_have_effect e) ->
+       Num 0xFFFFFFFFFFFFFFFFL
      | (e, T.BitOr, Num 0xFFFFFFFFFFFFFFFFL) when not (might_have_effect e) ->
        Num 0xFFFFFFFFFFFFFFFFL
 
@@ -146,7 +150,8 @@ let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
      | (Num n1, T.BitAnd, Num n2) -> Num (Int64.logand n1 n2)
      | (Num 0xFFFFFFFFFFFFFFFFL, T.BitAnd, e)
      | (e, T.BitAnd, Num 0xFFFFFFFFFFFFFFFFL) -> e
-     | (Num 0L, T.BitAnd, e)
+     (* Can't use or-patterns for the following two, according to compiler warning *)
+     | (Num 0L, T.BitAnd, e) when not (might_have_effect e) -> Num 0L
      | (e, T.BitAnd, Num 0L) when not (might_have_effect e) -> Num 0L
 
      (* And *)
