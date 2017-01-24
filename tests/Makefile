@@ -5,7 +5,7 @@
 OS := $(shell uname)
 ifeq ($(OS), Darwin)
 FORMAT = macho64
-PREFIX = _
+PREFIX = --prefix _
 else
 FORMAT = elf64
 PREFIX =
@@ -22,7 +22,7 @@ all : $(EXEC_FILES)
 	$(COMPILER) $(OPTIONS) $<
 
 %.o : %.s
-	nasm -f $(FORMAT) --prefix $(PREFIX) $<
+	nasm -f $(FORMAT) $(PREFIX) $<
 
 %.o : %.c
 
