@@ -18,8 +18,7 @@ To compile the compiler run `make` in the `src` directory. This should produce
 `compile.byte` and `interp.byte` executables. Both take a single command-line
 argument: a source file name with the `.expl` extension. `interp.byte` runs the
 file, `compile.byte` compiles it, generating an x86-46 assembly `.s` file in
-*nasm* syntax. The compiler has an optional argument `-osx` to generate OS X
-compatible assembly. Otherwise it generates Linux compatible assembly.
+*nasm* syntax.
 
 Compiling target programs
 -------------------------
@@ -27,12 +26,12 @@ Compiling target programs
 First run `make` in the `runtime` directory to compile the very simple runtime
 library (using gcc).
 
-Use `nasm -f macho64 FILENAME.s` to assemble the compiler's output for
-*FILENAME*, and then `gcc COMPILER_DIR/runtime/io.o FILENAME.o -o FILENAME`
-to link the program with the runtime library.
+On Linux, use `nasm -f elf64 FILENAME.s` to assemble the compiler's output for
+*FILENAME*. On Mac, use `nasm -f macho64 --prefix _ FILENAME.s`. Then use `gcc
+COMPILER_DIR/runtime/io.o FILENAME.o -o FILENAME` to link the program with the
+runtime library.
 
-See the `tests` directory for some example programs. NB, the `Makefile` in that
-directory must be edited to specialise it for either OS X or Linux.
+See the `tests` directory for some example programs.
 
 The source language
 -------------------
@@ -106,24 +105,20 @@ A program is just a stmts.
 Loading the compiler in utop
 ----------------------------
 
-First build the compiler, by running make from the src directory. Then load the
-packages that the compiler uses with the `#require` command:
+First build the compiler, by running make from the src directory. In utop load
+the packages that the compiler uses with the `#require` command:
 
 ```
-#require "ppx_deriving";;
-#require "ppx_deriving.ord";;
-#require "ppx_deriving.show";;
-#require "extlib";;
 #require "str";;
 ```
 
-You can add these 3 lines to the `.ocamlinit` file in your home directory, so
-that you don't have to manually enter them each time you start a new utop
-session. The contents of `.ocamlinit` are run each time you start a new utop.
+You can add this line to the `.ocamlinit` file in your home directory, so that
+you don't have to manually enter it each time you start a new utop session.
+The contents of `.ocamlinit` are run each time you start a new utop.
 
-The OCaml compilation manager stores all of the compiled OCaml sources in the
-`_build` directory, with the extension `.cmo`. The following tells utop to look
-there for source files.
+The OCaml compilation manager (ocamlbuild) stores all of the compiled OCaml
+sources in the `_build` directory, with the extension `.cmo`. The following
+tells utop to look there for source files.
 ```
 #directory "_build";;
 ```
@@ -133,5 +128,8 @@ To load a particular module, for example, LineariseCfg, use the `#load_rec` comm
 #load_rec "lineariseCfg.cmo";;
 ```
 
-Often a good way to work on a file is to `#load_rec` all of the modules that it
-depends on, and then `#use` the file.
+You can then open the module if you want (`open LineariseCfg`), or call
+functions directly (`LineariseCfg.cfg_to_linear`). Loading a compiled module in
+this way only gives you access to the values and functions that are exported in
+the corresponding `.mli` file. Often a good way to work on a file is to
+`#load_rec` all of the modules that it depends on, and then `#use` the file.
