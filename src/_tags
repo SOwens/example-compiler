@@ -1,2 +1,2 @@
-true : package(ppx_deriving.std,extlib,str,ppx_monadic)
+true : package(str)
 true : bin_annot

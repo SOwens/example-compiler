@@ -25,7 +25,6 @@ type linear =
   | CJump of test * bool * string (* jump to string if the test is bool *)
   | Jump of string
   | Label of string
-  [@@deriving show]
 
 let pp_linear fmt l =
   match l with
@@ -42,7 +41,6 @@ let pp_linear fmt l =
     Format.fprintf fmt "%s:@\n" s
 
 type linear_list = linear list
-  [@@deriving show]
 
 let rec pp_linear_list fmt ls =
   match ls with

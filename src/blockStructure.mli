@@ -24,7 +24,6 @@ type var =
   | Stack of int
   | NamedSource of string
   | NamedTmp of string * int
-  [@@deriving show]
 
 module Varset : sig
   include Set.S with type elt = var
@@ -39,7 +38,6 @@ end
 type atomic_exp =
   | Ident of var
   | Num of int64
-  [@@deriving show]
 
 type block_elem =
   | AssignOp of var * atomic_exp * Tokens.op * atomic_exp
@@ -53,19 +51,14 @@ type block_elem =
   (* BoundCheck (a1, a2) represents assert (a1 >= 0 && a1 < a2) *)
   | BoundCheck of atomic_exp * atomic_exp
 
-  [@@deriving show]
-
 type basic_block = block_elem list
-  [@@deriving show]
 
 type test_op =
   | Lt
   | Gt
   | Eq
-  [@@deriving show]
 
 type test = atomic_exp * test_op * atomic_exp
-  [@@deriving show]
 
 type next_block =
   | End
@@ -73,15 +66,14 @@ type next_block =
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
   | Branch of test * int * int
-  [@@deriving show]
 
 type cfg_entry = { bnum : int; elems : block_elem list; next : next_block;
                    mutable started : bool; mutable finished : bool }
-  [@@deriving show]
 
 type cfg = cfg_entry list
-  [@@deriving show]
 
+val pp_block_elem : Format.formatter -> block_elem -> unit
+val pp_test : Format.formatter -> test -> unit
 val build_cfg : SourceAst.stmt list -> cfg
 
 val cfg_to_graphviz : Format.formatter -> cfg -> unit

@@ -20,10 +20,8 @@ open Util
 open BlockStructure
 
 type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }
-  [@@deriving show]
 
 type cfg = (cfg_entry * cfg_annot) list
-  [@@deriving show]
 
 (* Add the identifier in a to the generation set *)
 let add_gen (a : atomic_exp) (gen : Varset.t) : Varset.t =

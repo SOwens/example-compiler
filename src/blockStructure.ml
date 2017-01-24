@@ -27,7 +27,21 @@ type var =
   | Stack of int
   | NamedSource of string
   | NamedTmp of string * int
-  [@@deriving ord]
+
+let compare_var v1 v2 =
+  match (v1, v2) with
+  | (Vreg i1, Vreg i2) -> compare i1 i2
+  | (Stack i1, Stack i2) -> compare i1 i2
+  | (NamedSource s1, NamedSource s2) -> String.compare s1 s2
+  | (NamedTmp (s1, i1), NamedTmp (s2, i2)) ->
+    let c = String.compare s1 s2 in
+    if c = 0 then
+      compare i1 i2
+    else
+      c
+  | (Vreg _, Stack _) | (Vreg _, NamedSource _) | (Vreg _, NamedTmp _)
+  | (Stack _, NamedSource _) | (Stack _, NamedTmp _) | (NamedSource _, NamedTmp _) -> -1
+  | _ -> 1
 
 let show_var v =
   match v with
@@ -48,7 +62,7 @@ module Varset' = Set.Make(VarCmp)
 
 module Varset = struct
   include Varset'
-  let show s = [%show: var list] (elements s)
+  let show s = show_list show_var (elements s)
   let pp fmt s = Format.fprintf fmt "%a" (pp_set pp_var) (elements s)
 end
 
@@ -86,7 +100,7 @@ let pp_block_elem fmt be =
     Format.fprintf fmt "%a := %a %s %a"
       pp_var v
       pp_atomic_exp ae1
-      (Tokens.op_to_string op)
+      (Tokens.show_op op)
       pp_atomic_exp ae2
   | AssignAtom (v, ae) ->
     Format.fprintf fmt "%a := %a"
@@ -122,13 +136,11 @@ let show_block_elem be =
   Format.flush_str_formatter ()
 
 type basic_block = block_elem list
-  [@@deriving show]
 
 type test_op =
   | Lt
   | Gt
   | Eq
-  [@@deriving show]
 
 let pp_test_op fmt op =
   match op with
@@ -137,7 +149,6 @@ let pp_test_op fmt op =
   | Eq -> Format.fprintf fmt "="
 
 type test = atomic_exp * test_op * atomic_exp
-  [@@deriving show]
 
 let pp_test fmt (ae1, op, ae2) =
   Format.fprintf fmt "%a %a %a"
@@ -154,7 +165,6 @@ type next_block =
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
   | Branch of test * int * int
-  [@@deriving show]
 
 let pp_next_block fmt nb =
   match nb with
@@ -169,7 +179,6 @@ let pp_next_block fmt nb =
 type cfg_entry =
   { bnum : int; elems : block_elem list; next : next_block;
     mutable started : bool; mutable finished : bool }
-  [@@deriving show]
 
 let pp_cfg_entry fmt e =
   Format.fprintf fmt "@[[B%d:@ %a@ %a]@]"
@@ -178,7 +187,6 @@ let pp_cfg_entry fmt e =
     pp_next_block e.next
 
 type cfg = cfg_entry list
-  [@@deriving show]
 
 let cfg_to_graphviz fmt (cfg : cfg) : unit =
   Format.fprintf fmt "digraph {@\nnode[shape=box]@\n%a@\n}"

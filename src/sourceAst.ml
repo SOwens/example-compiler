@@ -25,7 +25,6 @@ module T = Tokens
 type id =
   | Source of string
   | Temp of string * int
-  [@@deriving ord]
 
 let show_id i =
   match i with
@@ -34,6 +33,18 @@ let show_id i =
 
 let pp_id fmt i =
   Format.fprintf fmt "%s" (show_id i)
+
+let compare_id id1 id2 =
+  match (id1, id2) with
+  | (Source s1, Source s2) -> String.compare s1 s2
+  | (Temp _, Source _) -> -1
+  | (Source _, Temp _) -> 1
+  | (Temp (s1,i1), Temp (s2,i2)) ->
+    let c = String.compare s1 s2 in
+    if c = 0 then
+      compare i1 i2
+    else
+      c
 
 module Idord = struct
   type t = id
@@ -51,7 +62,6 @@ type exp =
   | Uop of T.uop * exp
   (* Allocate a new array of given dimensions. Initialise to 0 *)
   | Array of exp list
-  [@@deriving show]
 
 let rec pp_array_list f fmt l =
   match l with
@@ -76,11 +86,11 @@ let rec pp_exp fmt exp =
   | Op (e1, op, e2) ->
     Format.fprintf fmt "(@[%a@ %s@ %a@])"
       pp_exp e1
-      (Tokens.op_to_string op)
+      (Tokens.show_op op)
       pp_exp e2
   | Uop (uop, e) ->
     Format.fprintf fmt "@[<2>%s@ %a@]"
-      (Tokens.uop_to_string uop)
+      (Tokens.show_uop uop)
       pp_exp e
   | Array es ->
     Format.fprintf fmt "@[<2>array@ %a@]"
@@ -99,7 +109,6 @@ type stmt =
   | In of id
   | Out of id
   | Loc of stmt * int (* annotate a statement with it's source line number *)
-  [@@deriving show]
 
 let rec pp_stmt fmt stmt =
   match stmt with

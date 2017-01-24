@@ -19,6 +19,37 @@
 open Util
 open BlockStructure
 
+(* Copy and paste from extlib to get input_file without making a dependency.
+   extlib is LGPL 2.1, and so this sub-module is too.
+   https://github.com/ygrek/ocaml-extlib/blob/33f744ddb28d6a0f4c96832145e1a6e384644709/src/extList.ml
+*)
+
+exception Invalid_index of int
+
+type 'a mut_list =  {
+  hd: 'a;
+  mutable tl: 'a list
+}
+external inj : 'a mut_list -> 'a list = "%identity"
+let split_nth index = function
+  | [] -> if index = 0 then [],[] else raise (Invalid_index index)
+  | (h :: t as l) ->
+    if index = 0 then [],l
+    else if index < 0 then raise (Invalid_index index)
+    else
+      let rec loop n dst l =
+        if n = 0 then l else
+        match l with
+        | [] -> raise (Invalid_index index)
+        | h :: t ->
+          let r = { hd =  h; tl = [] } in
+          dst.tl <- inj r;
+          loop (n-1) r t
+      in
+      let r = { hd = h; tl = [] } in
+      inj r, loop (index-1) r t
+(* end copy/paste *)
+
 (* The basic type signature of a monad *)
 module type Monad = sig
   type 'a t
@@ -64,6 +95,8 @@ module M : VarNumMonad = struct
     x
 end
 
+(* TODO, remove monad *)
+(*
 let sequence (l : 'a M.t list) : 'a list M.t =
   let mcons p q =
     M.do_ ;
@@ -167,6 +200,7 @@ let count_vars (cfg : cfg) : int Varmap.t =
     return map
   in
   M.run m
+   *)
 
 let reg_alloc_ae (map : var Varmap.t) (ae : atomic_exp) : atomic_exp =
   match ae with
@@ -203,14 +237,14 @@ let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
 
 (* The returned int is the number of variables put on the stack *)
 let reg_alloc (num_regs : int) (cfg : cfg) : (cfg * int) =
-  let counts = count_vars cfg in
+  let counts = Varmap.empty (* TODO count_vars cfg*) in
   let counts_list = Varmap.bindings counts in
   let sorted_counts_list =
     List.map fst (List.sort (fun (_, x) (_, y) -> compare y x) counts_list)
   in
   let num_regs = min num_regs (List.length sorted_counts_list) in
   let num_stacks = List.length sorted_counts_list - num_regs in
-  let (in_regs,on_stack) = ExtLib.List.split_nth num_regs sorted_counts_list in
+  let (in_regs,on_stack) = split_nth num_regs sorted_counts_list in
   let reg_nums = List.map (fun x -> Vreg x) (count num_regs) in
   let stack_nums = List.map (fun x -> Stack x) (count num_stacks) in
   let alloc_list = zip in_regs reg_nums @ zip on_stack stack_nums in

@@ -31,14 +31,9 @@ type op =
   | Lshift
   | BitOr
   | BitAnd
-  [@@deriving show]
 
 type uop =
   | Not
-  [@@deriving show]
-
-val op_to_string : op -> string
-val uop_to_string : uop -> string
 
 type token =
   | Num of int64
@@ -62,9 +57,10 @@ type token =
   | Input
   | Output
   | Array
-  [@@deriving show]
 
 type tok_loc = (token * int)
-  [@@deriving show]
 
+val show_uop : uop -> string
+val show_op : op -> string
+val pp_tok_loc : Format.formatter -> tok_loc -> unit
 val lex : string -> int -> int -> tok_loc list

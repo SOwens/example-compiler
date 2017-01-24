@@ -105,7 +105,6 @@ type stmt =
   | Stmts of stmt list * int
   | In of id * int
   | Out of id * int
-             [@@deriving show]
 
 (* Convert the first expression in toks into an AST. Return it with the left
    over tokens *)

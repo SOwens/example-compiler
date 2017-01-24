@@ -38,13 +38,11 @@ type op =
   | Lshift
   | BitOr
   | BitAnd
-  [@@deriving show]
 
 type uop =
   | Not
-  [@@deriving show]
 
-let op_to_string op =
+let show_op op =
   match op with
   | Plus -> "+"
   | Minus -> "-"
@@ -59,7 +57,7 @@ let op_to_string op =
   | BitOr -> "|"
   | BitAnd -> "&"
 
-let uop_to_string uop =
+let show_uop uop =
   match uop with
   | Not -> "!"
 
@@ -85,21 +83,47 @@ type token =
   | Input
   | Output
   | Array
-  [@@deriving show]
+
+let token_to_string token =
+  match token with
+  | Num i -> Int64.to_string i
+  | Ident s -> s
+  | Op o -> show_op o
+  | Uop u -> show_uop u
+  | Lparen -> "("
+  | Rparen -> ")"
+  | Lcurly -> "{"
+  | Rcurly -> "}"
+  | Lbrac -> "["
+  | Rbrac -> "]"
+  | While -> "while"
+  | Do -> "do"
+  | If -> "if"
+  | Then -> "then"
+  | Else -> "else"
+  | Assign -> ":="
+  | True -> "true"
+  | False -> "false"
+  | Input -> "input"
+  | Output -> "output"
+  | Array -> "array"
+
+let pp_token fmt token =
+  Format.fprintf fmt "%s" (token_to_string token)
 
 type tok_loc = (token * int)
-  [@@ deriving show]
+
+let pp_tok_loc fmt (t, l) =
+  Format.fprintf fmt "(%a, %d)" pp_token t l
 
 let keywords =
-  [("do", Do); ("while",While); ("if",If); ("then",Then); ("else",Else);
-   ("array",Array); (":=",Assign); ("true",True); ("input", Input);
-   ("output",Output); ("false",False); ("(",Lparen); (")",Rparen);
-   ("{",Lcurly); ("}",Rcurly); ("[",Lbrac); ("]",Rbrac);
-
-   (* Derive the mapping from the to_string functions to avoid duplication *)
-   (uop_to_string Not, Uop Not)] @
-  List.map (fun o -> (op_to_string o, Op o))
-    [Plus; Minus; Times; Div; Lt; Gt; Eq; And; Or; Lshift; BitOr; BitAnd]
+  (* Derive the mapping from the to_string functions to avoid duplication *)
+  (show_uop Not, Uop Not) ::
+  List.map (fun o -> (show_op o, Op o))
+    [Plus; Minus; Times; Div; Lt; Gt; Eq; And; Or; Lshift; BitOr; BitAnd] @
+  List.map (fun t -> (token_to_string t, t))
+    [Do; While; If; Then; Else; Array; Assign; True; Input; Output; False;
+     Lparen; Rparen; Lcurly; Rcurly; Lbrac; Rbrac]
 
 (* Map each keyword string to its corresponding token *)
 let keyword_map : token Strmap.t =

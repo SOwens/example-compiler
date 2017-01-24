@@ -1,55 +1,62 @@
-util.cmo :
-util.cmx :
-tokens.cmo : util.cmo tokens.cmi
-tokens.cmx : util.cmx tokens.cmi
-sourceAst.cmo : util.cmo tokens.cmi sourceAst.cmi
-sourceAst.cmx : util.cmx tokens.cmx sourceAst.cmi
-typeCheck.cmo : util.cmo tokens.cmi sourceAst.cmi typeCheck.cmi
-typeCheck.cmx : util.cmx tokens.cmx sourceAst.cmx typeCheck.cmi
-frontEnd.cmo : util.cmo typeCheck.cmi tokens.cmi sourceAst.cmi frontEnd.cmi
-frontEnd.cmx : util.cmx typeCheck.cmx tokens.cmx sourceAst.cmx frontEnd.cmi
-constProp.cmo : util.cmo tokens.cmi sourceAst.cmi constProp.cmi
-constProp.cmx : util.cmx tokens.cmx sourceAst.cmx constProp.cmi
-unnestExp.cmo : util.cmo tokens.cmi sourceAst.cmi unnestExp.cmi
-unnestExp.cmx : util.cmx tokens.cmx sourceAst.cmx unnestExp.cmi
-removeBool.cmo : tokens.cmi sourceAst.cmi removeBool.cmi
-removeBool.cmx : tokens.cmx sourceAst.cmx removeBool.cmi
+astInterp.cmo : util.cmo tokens.cmi sourceAst.cmi astInterp.cmi
+astInterp.cmx : util.cmx tokens.cmx sourceAst.cmx astInterp.cmi
+astInterp.cmi : tokens.cmi sourceAst.cmi
+blockInterp.cmo : util.cmo lineariseCfg.cmi blockStructure.cmi astInterp.cmi \
+    blockInterp.cmi
+blockInterp.cmx : util.cmx lineariseCfg.cmx blockStructure.cmx astInterp.cmx \
+    blockInterp.cmi
+blockInterp.cmi : blockStructure.cmi
 blockStructure.cmo : util.cmo tokens.cmi sourceAst.cmi blockStructure.cmi
 blockStructure.cmx : util.cmx tokens.cmx sourceAst.cmx blockStructure.cmi
-shrinkImmediates.cmo : tokens.cmi blockStructure.cmi shrinkImmediates.cmi
-shrinkImmediates.cmx : tokens.cmx blockStructure.cmx shrinkImmediates.cmi
-liveVarAnalysis.cmo : util.cmo blockStructure.cmi liveVarAnalysis.cmi
-liveVarAnalysis.cmx : util.cmx blockStructure.cmx liveVarAnalysis.cmi
-regAlloc.cmo : util.cmo blockStructure.cmi regAlloc.cmi
-regAlloc.cmx : util.cmx blockStructure.cmx regAlloc.cmi
-lineariseCfg.cmo : blockStructure.cmi lineariseCfg.cmi
-lineariseCfg.cmx : blockStructure.cmx lineariseCfg.cmi
-x86.cmo : util.cmo
-x86.cmx : util.cmx
-instrSelX86.cmo : x86.cmo util.cmo tokens.cmi lineariseCfg.cmi \
-    blockStructure.cmi instrSelX86.cmi
-instrSelX86.cmx : x86.cmx util.cmx tokens.cmx lineariseCfg.cmx \
-    blockStructure.cmx instrSelX86.cmi
-interp.cmo : util.cmo tokens.cmi sourceAst.cmi frontEnd.cmi
-interp.cmx : util.cmx tokens.cmx sourceAst.cmx frontEnd.cmx
+blockStructure.cmi : tokens.cmi sourceAst.cmi
 compile.cmo : x86.cmo util.cmo unnestExp.cmi sourceAst.cmi \
     shrinkImmediates.cmi regAlloc.cmi liveVarAnalysis.cmi lineariseCfg.cmi \
     instrSelX86.cmi frontEnd.cmi constProp.cmi blockStructure.cmi
 compile.cmx : x86.cmx util.cmx unnestExp.cmx sourceAst.cmx \
     shrinkImmediates.cmx regAlloc.cmx liveVarAnalysis.cmx lineariseCfg.cmx \
     instrSelX86.cmx frontEnd.cmx constProp.cmx blockStructure.cmx
+constProp.cmo : util.cmo tokens.cmi sourceAst.cmi constProp.cmi
+constProp.cmx : util.cmx tokens.cmx sourceAst.cmx constProp.cmi
+constProp.cmi : sourceAst.cmi
+frontEnd.cmo : util.cmo typeCheck.cmi tokens.cmi sourceAst.cmi frontEnd.cmi
+frontEnd.cmx : util.cmx typeCheck.cmx tokens.cmx sourceAst.cmx frontEnd.cmi
+frontEnd.cmi : sourceAst.cmi
+instrSelX86.cmo : x86.cmo util.cmo tokens.cmi lineariseCfg.cmi \
+    blockStructure.cmi instrSelX86.cmi
+instrSelX86.cmx : x86.cmx util.cmx tokens.cmx lineariseCfg.cmx \
+    blockStructure.cmx instrSelX86.cmi
+instrSelX86.cmi : x86.cmo lineariseCfg.cmi
+interp.cmo : sourceAst.cmi frontEnd.cmi astInterp.cmi
+interp.cmx : sourceAst.cmx frontEnd.cmx astInterp.cmx
+lineariseCfg.cmo : util.cmo blockStructure.cmi lineariseCfg.cmi
+lineariseCfg.cmx : util.cmx blockStructure.cmx lineariseCfg.cmi
+lineariseCfg.cmi : util.cmo blockStructure.cmi
+liveVarAnalysis.cmo : util.cmo tokens.cmi blockStructure.cmi \
+    liveVarAnalysis.cmi
+liveVarAnalysis.cmx : util.cmx tokens.cmx blockStructure.cmx \
+    liveVarAnalysis.cmi
+liveVarAnalysis.cmi : util.cmo blockStructure.cmi
 pretty.cmo : util.cmo tokens.cmi sourceAst.cmi
 pretty.cmx : util.cmx tokens.cmx sourceAst.cmx
-tokens.cmi :
-sourceAst.cmi : tokens.cmi
-typeCheck.cmi : sourceAst.cmi
-frontEnd.cmi : sourceAst.cmi
-constProp.cmi : sourceAst.cmi
-unnestExp.cmi : sourceAst.cmi
-removeBool.cmi : sourceAst.cmi
-blockStructure.cmi : tokens.cmi sourceAst.cmi
-shrinkImmediates.cmi : blockStructure.cmi
-liveVarAnalysis.cmi : util.cmo blockStructure.cmi
+regAlloc.cmo : util.cmo blockStructure.cmi regAlloc.cmi
+regAlloc.cmx : util.cmx blockStructure.cmx regAlloc.cmi
 regAlloc.cmi : blockStructure.cmi
-lineariseCfg.cmi : blockStructure.cmi
-instrSelX86.cmi : x86.cmo lineariseCfg.cmi
+shrinkImmediates.cmo : tokens.cmi blockStructure.cmi shrinkImmediates.cmi
+shrinkImmediates.cmx : tokens.cmx blockStructure.cmx shrinkImmediates.cmi
+shrinkImmediates.cmi : blockStructure.cmi
+sourceAst.cmo : util.cmo tokens.cmi sourceAst.cmi
+sourceAst.cmx : util.cmx tokens.cmx sourceAst.cmi
+sourceAst.cmi : tokens.cmi
+tokens.cmo : util.cmo tokens.cmi
+tokens.cmx : util.cmx tokens.cmi
+tokens.cmi :
+typeCheck.cmo : util.cmo tokens.cmi sourceAst.cmi typeCheck.cmi
+typeCheck.cmx : util.cmx tokens.cmx sourceAst.cmx typeCheck.cmi
+typeCheck.cmi : sourceAst.cmi
+unnestExp.cmo : util.cmo tokens.cmi sourceAst.cmi unnestExp.cmi
+unnestExp.cmx : util.cmx tokens.cmx sourceAst.cmx unnestExp.cmi
+unnestExp.cmi : sourceAst.cmi
+util.cmo :
+util.cmx :
+x86.cmo : util.cmo
+x86.cmx : util.cmx

@@ -37,6 +37,19 @@ let rec zip (l1 : 'a list) (l2 : 'b list) : ('a * 'b) list =
   | (h1::t1, h2::t2) -> (h1,h2) :: zip t1 t2
   | _ -> []
 
+let show_list' d1 d2 show l =
+  let rec f l =
+    match l with
+    | [] -> ""
+    | [h] -> show h
+    | (h::t) ->
+      show h ^ "; " ^ f t
+  in
+    d1 ^ f l ^ d2
+
+let show_list show = show_list' "[" "]" show
+let show_set show = show_list' "{" "}" show
+
 let pp_list' d1 d2 pp fmt l =
   let rec f fmt l =
     match l with

@@ -22,7 +22,6 @@
 type id =
   | Source of string
   | Temp of string * int
-  [@@deriving show, ord]
 
 module Idmap : Map.S with type key = id
 
@@ -34,7 +33,6 @@ type exp =
   | Uop of Tokens.uop * exp
   (* Allocate a new array of given dimensions. Initialise to 0 *)
   | Array of exp list
-  [@@deriving show]
 
 type stmt =
   | Assign of id * exp list * exp
@@ -48,8 +46,9 @@ type stmt =
   | In of id
   | Out of id
   | Loc of stmt * int (* annotate a statement with it's source line number *)
-  [@@deriving show]
 
+val show_id : id -> string
+val pp_stmt : Format.formatter -> stmt -> unit
 val pp_stmts : Format.formatter -> stmt list -> unit
 
 val parse_program : (Tokens.token * int) list -> stmt list
