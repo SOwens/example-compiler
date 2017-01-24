@@ -5,19 +5,17 @@ Windows).
 Running the compiler
 --------------------
 
-The compiler relies on OCaml and several libraries: ocamlfind, extlib,
-ppx_deriving, and ppx_monadic. It is tested with OCaml version 4.02.3, and
-ocamlfind 1.5.6, extlib 1.7.0, ppx_deriving 3.0, and ppx_monadic 1.0.3. All of
-these libraries can be installed via opam. Opam installs everything into
-`.opam` in your home directory:
+The compiler relies on OCaml and the ocamlfind library. It is tested with OCaml
+versions 4.02.3 and 4.04.0, and ocamlfind 1.5.6 and 1.7.1. Ocamlfind can be
+installed via opam. If you have installed anything via Opam (for example,
+Merlin, or ocp-indent), ocamlfind is probably installed already. Opam installs
+everything into `.opam` in your home directory:
 ```
-opam install extlib
-opam install ppx_deriving
-opam install ppx_monadic
+opam install ocamlfind
 ```
 
 To compile the compiler run `make` in the `src` directory. This should produce
-`compile.byte` and `interp.byte` executables.  Both take a single command-line
+`compile.byte` and `interp.byte` executables. Both take a single command-line
 argument: a source file name with the `.expl` extension. `interp.byte` runs the
 file, `compile.byte` compiles it, generating an x86-46 assembly `.s` file in
 *nasm* syntax. The compiler has an optional argument `-osx` to generate OS X
