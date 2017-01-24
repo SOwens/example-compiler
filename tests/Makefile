@@ -1,10 +1,15 @@
-# For OS X
-# FORMAT = macho64
-# OPTIONS = -osx
-
-# For Linux
-# FORMAT = elf64
-# OPTIONS = -linux
+# Try to detect the operating system to set flags for the assembler.
+# OSX uses macho64 binary format, and needs an _ prefixed before all global
+# symbols. Linux uses elf64 binary format, and the symbols are all fine as they
+# are.
+OS := $(shell uname)
+ifeq ($(OS), Darwin)
+FORMAT = macho64
+PREFIX = _
+else
+FORMAT = elf64
+PREFIX =
+endif
 
 COMPILER = ../src/compile.byte
 EXEC_FILES = fact.exe array.exe insert_sort.exe div.exe
@@ -17,7 +22,7 @@ all : $(EXEC_FILES)
 	$(COMPILER) $(OPTIONS) $<
 
 %.o : %.s
-	nasm -f $(FORMAT) $<
+	nasm -f $(FORMAT) --prefix $(PREFIX) $<
 
 %.o : %.c
 

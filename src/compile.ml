@@ -22,17 +22,10 @@ open Util
 open Format
 
 (* Command-line arguments *)
-let osx = ref false;;
 let filename_ref = ref None;;
 
 let options = Arg.align ([
-  ( "-osx",
-    Arg.Set osx,
-    " generate assembler for OS X");
-   ( "-linux",
-    Arg.Clear osx,
-    " generate assembler for Linux (default)");
-  ]);;
+ ]);;
 
 let usage_msg =
   "example compiler \nexample usage:       compile.byte test.expl\n"
@@ -116,24 +109,22 @@ let (reg_cfg, num_stack) =
 let linear = LineariseCfg.cfg_to_linear reg_cfg;;
 (* printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;; *)
 
-let under = if !osx then "_" else "";;
-
-let x86 = InstrSelX86.to_x86 (!osx) linear num_stack;;
+let x86 = InstrSelX86.to_x86 linear num_stack;;
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
 (* Assembly wrapper *)
 fprintf fmt "[section .text align=16]@\n";;
-fprintf fmt "global %smain@\n@\n" under;;
-fprintf fmt "extern %sinput@\n" under;;
-fprintf fmt "extern %soutput@\n" under;;
-fprintf fmt "extern %sallocate1@\n" under;;
-fprintf fmt "extern %sallocate2@\n" under;;
-fprintf fmt "extern %sallocate3@\n" under;;
-fprintf fmt "extern %sallocate4@\n" under;;
-fprintf fmt "extern %sallocate5@\n" under;;
-fprintf fmt "extern %sallocate6@\n" under;;
-fprintf fmt "extern %sallocate7@\n@\n" under;;
-fprintf fmt "%smain:@\n" under;;
+fprintf fmt "global main@\n@\n";;
+fprintf fmt "extern input@\n";;
+fprintf fmt "extern output@\n";;
+fprintf fmt "extern allocate1@\n";;
+fprintf fmt "extern allocate2@\n";;
+fprintf fmt "extern allocate3@\n";;
+fprintf fmt "extern allocate4@\n";;
+fprintf fmt "extern allocate5@\n";;
+fprintf fmt "extern allocate6@\n";;
+fprintf fmt "extern allocate7@\n@\n";;
+fprintf fmt "main:@\n";;
 fprintf fmt "%a" X86.pp_instr_list x86;;
 (* Prepare for exit system call *)
 fprintf fmt "@\nexit:@\n";;

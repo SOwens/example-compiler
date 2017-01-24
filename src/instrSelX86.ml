@@ -280,11 +280,11 @@ let test_to_x86 ae1 op ae2 b (label : string) : instruction list =
     else
       []
 
-let rec be_to_x86 (underscore_labels : bool) be : instruction list =
+let rec be_to_x86 be : instruction list =
   match be with
   | AssignOp (v, Num imm, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     (* constant prop ensures both aren't immediate *)
-    be_to_x86 underscore_labels (AssignOp (v, ae2, reverse_op op, Num imm))
+    be_to_x86 (AssignOp (v, ae2, reverse_op op, Num imm))
   | AssignOp (v, Ident v2, ((T.Lt | T.Gt | T.Eq) as op), ae2) ->
     let (instrs, cmp_arg) = rm_ae_to_dest_src (var_to_rm v2) ae2 in
     let cmp_instrs = instrs @ [Zbinop (Zcmp, cmp_arg)] in
@@ -337,7 +337,7 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     instrs2 @
     [Zmov dest_src]
   | Call (v, f, aes) ->
-    let alloc_name = (if underscore_labels then "_" else "") ^ f in
+    let alloc_name = f in
     caller_save @
     setup_args aes reg_list [] @
     [Zcall alloc_name] @
@@ -349,7 +349,7 @@ let rec be_to_x86 (underscore_labels : bool) be : instruction list =
     test_to_x86 a1 Lt (Num 0L) true "bound_error" @
     test_to_x86 a1 Lt a2 false "bound_error"
 
-let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int)
+let to_x86 (ll : L.linear list) (num_stack : int)
   : instruction list =
   (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
   let num_stack =
@@ -365,7 +365,7 @@ let to_x86 (underscore_labels : bool) (ll : L.linear list) (num_stack : int)
     (List.map
        (fun l ->
           match l with
-          | L.Instr be -> be_to_x86 underscore_labels be
+          | L.Instr be -> be_to_x86 be
           | L.CJump ((ae1, op, ae2), b, s) ->
             test_to_x86 ae1 op ae2 b s
           | L.Jump s ->
