@@ -95,25 +95,18 @@ module M : VarNumMonad = struct
     x
 end
 
-(* TODO, remove monad *)
-(*
+let (>>=) = M.bind
+
+let mcons p q = p >>= (fun x -> q >>= (fun y -> M.return (x::y)))
+
 let sequence (l : 'a M.t list) : 'a list M.t =
-  let mcons p q =
-    M.do_ ;
-    x <-- p;
-    y <-- q;
-    return (x::y) in
   List.fold_right mcons l (M.return [])
 
 let mapM (f : 'a -> 'b M.t) (al : 'a list) : 'b list M.t =
   sequence (List.map f al)
 
 let sequence_ (l : unit M.t list) : unit M.t =
-  let mcons p q =
-    M.do_ ;
-    x <-- p;
-    y <-- q;
-    return () in
+  let mcons p q = p >>= (fun x -> q >>= (fun y -> M.return ())) in
   List.fold_right mcons l (M.return ())
 
 let mapM_ (f : 'a -> unit M.t) (al : 'a list) : unit M.t =
@@ -122,50 +115,41 @@ let mapM_ (f : 'a -> unit M.t) (al : 'a list) : unit M.t =
 let count_vars_ae (ae : atomic_exp) : unit M.t =
   match ae with
   | Ident r ->
-    M.do_ ;
-    M.inc_var r;
-    return ()
+    M.inc_var r >>= (fun _ -> M.return ())
   | Num x -> M.return ()
 
 let count_vars_be (be : block_elem) : unit M.t =
   match be with
   | AssignOp (r, ae1, op, ae2) ->
-    M.do_ ;
-    M.inc_var r;
-    count_vars_ae ae1;
-    count_vars_ae ae2;
-    return ()
+    M.inc_var r >>= (fun _ ->
+    count_vars_ae ae1 >>= (fun _ ->
+    count_vars_ae ae2 >>= (fun _ ->
+    M.return ())))
   | AssignAtom (r, ae) ->
-    M.do_ ;
-    M.inc_var r;
-    count_vars_ae ae;
-    return ()
+    M.inc_var r >>= (fun _ ->
+    count_vars_ae ae >>= (fun _ ->
+    M.return ()))
   | Ld (v1, v2, ae) ->
-    M.do_ ;
-    M.inc_var v1;
-    M.inc_var v2;
-    count_vars_ae ae;
-    return ()
+    M.inc_var v1 >>= (fun _ ->
+    M.inc_var v2 >>= (fun _ ->
+    count_vars_ae ae >>= (fun _ ->
+    M.return ())))
   | St (r, ae1, ae2) ->
-    M.do_ ;
-    M.inc_var r;
-    count_vars_ae ae1;
-    count_vars_ae ae2;
-    return ()
+    M.inc_var r >>= (fun _ ->
+    count_vars_ae ae1 >>= (fun _ ->
+    count_vars_ae ae2 >>= (fun _ ->
+    M.return ())))
   | Call (None, f, aes) ->
-    M.do_ ;
-    mapM_ count_vars_ae aes;
-    return ()
+    mapM_ count_vars_ae aes >>= (fun _ ->
+    M.return ())
   | Call (Some i, f, aes) ->
-    M.do_ ;
-    M.inc_var i;
-    mapM_ count_vars_ae aes;
-    return ()
+    M.inc_var i >>= (fun _ ->
+    mapM_ count_vars_ae aes >>= (fun _ ->
+    M.return ()))
   | BoundCheck (a1, a2) ->
-    M.do_ ;
-    count_vars_ae a1;
-    count_vars_ae a2;
-    return ()
+    count_vars_ae a1 >>= (fun _ ->
+    count_vars_ae a2 >>= (fun _ ->
+    M.return ()))
 
 let count_vars_test (ae1, op, ae2) : unit M.t =
   let vars =
@@ -182,25 +166,19 @@ let count_vars_nb (nb : next_block) : unit M.t =
   | End -> M.return ()
   | Next i -> M.return ()
   | Branch (r, t1, t2) ->
-    M.do_ ;
-    count_vars_test r;
-    return ()
+    count_vars_test r >>= (fun _ ->
+    M.return ())
 
 let count_vars (cfg : cfg) : int Varmap.t =
   let m =
-    M.do_ ;
     mapM_
       (fun e ->
-         M.do_ ;
-         mapM_ count_vars_be e.elems;
-         count_vars_nb e.next;
-         return ())
-      cfg;
-    map <-- M.get_counts;
-    return map
+         mapM_ count_vars_be e.elems >>= (fun _ ->
+         count_vars_nb e.next >>= (fun _ ->
+         M.return ())))
+      cfg >>= (fun _ -> M.get_counts >>= M.return)
   in
   M.run m
-   *)
 
 let reg_alloc_ae (map : var Varmap.t) (ae : atomic_exp) : atomic_exp =
   match ae with
@@ -237,7 +215,7 @@ let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
 
 (* The returned int is the number of variables put on the stack *)
 let reg_alloc (num_regs : int) (cfg : cfg) : (cfg * int) =
-  let counts = Varmap.empty (* TODO count_vars cfg*) in
+  let counts = count_vars cfg in
   let counts_list = Varmap.bindings counts in
   let sorted_counts_list =
     List.map fst (List.sort (fun (_, x) (_, y) -> compare y x) counts_list)
