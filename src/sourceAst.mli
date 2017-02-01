@@ -47,9 +47,22 @@ type stmt =
   | Out of id
   | Loc of stmt * int (* annotate a statement with it's source line number *)
 
+type typ =
+  | Int
+  | Bool
+  (* An int array with the given number of dimensions *)
+  | Array of int
+
+type var_dec = { var_name : id; typ : typ; init : exp }
+
+type func = { fun_name : id; params : (id * typ) list; ret : typ;
+              locals : var_dec list; body : stmt list }
+
+type prog = { globals : var_dec list; funcs : func list }
+
 val show_id : id -> string
 val pp_stmt : Format.formatter -> stmt -> unit
 val pp_stmts : Format.formatter -> stmt list -> unit
-
-val parse_program : (Tokens.token * int) list -> stmt list
+val pp_program : Format.formatter -> prog -> unit
+val parse_program : (Tokens.token * int) list -> prog
 val stmts_to_stmt : stmt list -> stmt

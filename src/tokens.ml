@@ -83,6 +83,11 @@ type token =
   | Input
   | Output
   | Array
+  | Int
+  | Bool
+  | Colon
+  | Let
+  | Function
 
 let token_to_string token =
   match token with
@@ -107,6 +112,11 @@ let token_to_string token =
   | Input -> "input"
   | Output -> "output"
   | Array -> "array"
+  | Int -> "int"
+  | Bool -> "bool"
+  | Colon -> ":"
+  | Let -> "let"
+  | Function -> "function"
 
 let pp_token fmt token =
   Format.fprintf fmt "%s" (token_to_string token)
@@ -123,7 +133,7 @@ let keywords =
     [Plus; Minus; Times; Div; Lt; Gt; Eq; And; Or; Lshift; BitOr; BitAnd] @
   List.map (fun t -> (token_to_string t, t))
     [Do; While; If; Then; Else; Array; Assign; True; Input; Output; False;
-     Lparen; Rparen; Lcurly; Rcurly; Lbrac; Rbrac]
+     Lparen; Rparen; Lcurly; Rcurly; Lbrac; Rbrac; Int; Bool; Colon; Let; Function]
 
 (* Map each keyword string to its corresponding token *)
 let keyword_map : token Strmap.t =

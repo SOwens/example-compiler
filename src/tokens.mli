@@ -57,6 +57,11 @@ type token =
   | Input
   | Output
   | Array
+  | Int
+  | Bool
+  | Colon
+  | Let
+  | Function
 
 type tok_loc = (token * int)
 

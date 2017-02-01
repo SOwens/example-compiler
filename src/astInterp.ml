@@ -204,3 +204,8 @@ and interp_stmts (store : store_t) (sl : stmt list) : store_t = match sl with
   | s::sl ->
     let store2 = interp_stmt store s in
     interp_stmts store2 sl;;
+
+let interp_prog (store : store_t) (sl : prog) : store_t =
+  (* TODO *)
+  assert false
+

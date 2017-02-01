@@ -140,8 +140,8 @@ let rec pp_stmt fmt stmt =
       pp_stmt s1
       pp_stmt s2
   | Stmts slist ->
-    Format.fprintf fmt "%a"
-      (pp_set pp_stmt) slist
+    Format.fprintf fmt "{@\n%a}"
+      pp_stmts slist
   | In i ->
     Format.fprintf fmt "@[<2>input@ %a@]"
       pp_id i
@@ -151,9 +151,78 @@ let rec pp_stmt fmt stmt =
   | Loc (s, _) ->
     pp_stmt fmt s
 
-let pp_stmts fmt (stmts : stmt list) : unit =
-  Format.fprintf fmt "%a"
-    (pp_list pp_stmt) stmts
+and pp_stmts fmt (stmts : stmt list) : unit =
+  let rec pp fmt stmts =
+    match stmts with
+    | [] -> ()
+    | stmt::stmts ->
+      Format.fprintf fmt "%a@\n%a"
+        pp_stmt stmt
+        pp stmts
+  in
+  Format.fprintf fmt "@[<v>%a@]"
+    pp stmts
+
+(* AST of types *)
+type typ =
+  | Int
+  | Bool
+  (* An int array with the given number of dimensions *)
+  | Array of int
+
+let pp_typ fmt t =
+  match t with
+  | Int -> Format.fprintf fmt "int"
+  | Bool -> Format.fprintf fmt "bool"
+  | Array n -> Format.fprintf fmt "array@ %d" n
+
+(* AST of variable and function declarations *)
+type var_dec = { var_name : id; typ : typ; init : exp }
+
+type func = { fun_name : id; params : (id * typ) list; ret : typ;
+              locals : var_dec list; body : stmt list }
+
+let pp_var_dec fmt var_dec =
+  Format.fprintf fmt "let@ %a@ :@ %a@ =@ %a"
+    pp_id var_dec.var_name
+    pp_typ var_dec.typ
+    pp_exp var_dec.init
+
+let pp_var_decs fmt (var_decs : var_dec list) : unit =
+  let rec pp fmt var_decs =
+    match var_decs with
+    | [] -> ()
+    | var_dec::var_decs ->
+      Format.fprintf fmt "%a@\n%a"
+        pp_var_dec var_dec
+        pp var_decs
+  in
+  Format.fprintf fmt "@[<v>%a@]"
+    pp var_decs
+
+let rec pp_params fmt (params : (id * typ) list) : unit =
+  match params with
+  | [] -> ()
+  | (n,t)::params ->
+    Format.fprintf fmt "@[(%a@ :@ %a)@]@ %a"
+      pp_id n
+      pp_typ t
+      pp_params params
+
+let pp_func fmt func =
+  Format.fprintf fmt "@[<2>function@ %a@ %a@ :@ %a@ {@\n%a%a}]@\n"
+    pp_id func.fun_name
+    pp_params func.params
+    pp_typ func.ret
+    pp_var_decs func.locals
+    pp_stmts func.body
+
+(* AST of complete programs *)
+type prog = { globals : var_dec list; funcs : func list }
+
+let rec pp_program fmt p =
+  pp_var_decs fmt p.globals;
+  List.iter (pp_func fmt) p.funcs
 
 (* Raise a parse error *)
 let parse_error (ln : int) (msg : string) : 'a =
@@ -244,7 +313,7 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
     parse_error ln "Bad statement"
 
 (* Convert all of the statement in toks into an AST, stopping on a }. Return
-   them with the left over tokens *)
+   them with the left over tokens, not including the } *)
 and parse_stmt_list (toks : T.tok_loc list) : stmt list * T.tok_loc list =
   match toks with
   | ((T.Rcurly, _) :: toks) -> ([], toks)
@@ -253,15 +322,97 @@ and parse_stmt_list (toks : T.tok_loc list) : stmt list * T.tok_loc list =
     let (s_list, toks) = parse_stmt_list toks in
     (s::s_list, toks)
 
-(* Repeatedly parse statments until the input is empty *)
-(* NB, the difference between parse_stmt_list which can leave leftover tokens *)
-let rec parse_program (toks : T.tok_loc list) : stmt list =
+(* Convert the first typ in toks into an AST. Return it with the left over
+   tokens. *)
+let parse_typ (toks : T.tok_loc list) : typ * T.tok_loc list =
   match toks with
-  | [] -> []
-  | _ ->
-    let (s, toks) = parse_stmt toks in
-    let s_list = parse_program toks in
-    s::s_list
+  | [] -> raise (BadInput "End of file while parsing a type")
+  | (T.Int, _) :: toks -> (Int, toks)
+  | (T.Bool, _) :: toks -> (Bool, toks)
+  | (T.Array, _) :: (T.Num n, _) :: toks -> (Array (Int64.to_int n), toks)
+  | (_,ln) :: _ -> parse_error ln "Bad type"
+
+(* Convert the first funciton parameter toks into an AST. Return it with the
+   left over tokens. *)
+let parse_param (toks : T.tok_loc list) : (id * typ) * T.tok_loc list =
+  match toks with
+  | [] -> raise (BadInput "End of file while parsing a function parameter")
+  | (T.Lparen, ln) :: (T.Ident x, _) :: (T.Colon,_) :: toks ->
+    (match parse_typ toks with
+     | (t, (T.Rparen, _)::toks) ->
+       ((Source x, t), toks)
+     | _ -> parse_error ln "function parameter missing )")
+  | (_,ln)::_ -> parse_error ln "bad function parameter"
+
+(* Convert a list of function parameters in toks into an AST. Return it with
+   the left over tokens. Recognise when the list is over by the next token not
+   being Lparen *)
+let rec parse_param_list (toks : T.tok_loc list) : (id * typ) list * T.tok_loc list =
+  match toks with
+  | ((T.Lparen, _) :: _) ->
+    let (v, toks) = parse_param toks in
+    let (v_list, toks) = parse_param_list toks in
+    (v::v_list, toks)
+  | _ -> ([], toks)
+
+
+(* Convert the first variable declaration in toks into an AST. Return it with
+   the left over tokens. *)
+let parse_var_dec (toks : T.tok_loc list) : var_dec * T.tok_loc list =
+  match toks with
+  | [] -> raise (BadInput "End of file while parsing a variable declaration")
+  | (T.Let, ln) :: (T.Ident x, _) :: (T.Colon,_) :: toks ->
+    (match parse_typ toks with
+     | (t, (T.Op T.Eq, _)::toks) ->
+       let (e, toks) = parse_exp toks in
+       ({ var_name = Source x; typ = t; init = e }, toks)
+     | _ -> parse_error ln "variable declaration missing =")
+  | (_,ln)::_ -> parse_error ln "bad variable declaration"
+
+(* Convert a list of variable declaration in toks into an AST. Return it with
+   the left over tokens. Recognise when the list is over by the next token not
+   being Let *)
+let rec parse_var_dec_list (toks : T.tok_loc list) : var_dec list * T.tok_loc list =
+  match toks with
+  | ((T.Let, _) :: _) ->
+    let (v, toks) = parse_var_dec toks in
+    let (v_list, toks) = parse_var_dec_list toks in
+    (v::v_list, toks)
+  | _ -> ([], toks)
+
+(* Convert the first function declaration in toks into an AST. Return it with
+   the left over tokens. *)
+let parse_func (toks : T.tok_loc list) : func * T.tok_loc list =
+  match toks with
+  | [] -> raise (BadInput "End of file while parsing a function declaration")
+  | (T.Function, ln) :: (T.Ident x, _) :: toks ->
+     (match parse_param_list toks with
+      | (params, (T.Colon, _) :: toks) ->
+        (match parse_typ toks with
+         | (t, (T.Lcurly, _) :: toks) ->
+           let (var_decs, toks) = parse_var_dec_list toks in
+           let (stmts, toks) = parse_stmt_list toks in
+           ({ fun_name = Source x;
+              params = params;
+              ret = t;
+              locals = var_decs;
+              body = stmts }, toks)
+         | _ -> parse_error ln "bad function declaration, missing {")
+      | _ -> parse_error ln "bad function declaration, missing :")
+  | (_,ln)::_ -> parse_error ln "bad function declaration"
+
+(* Parse global variable declarations, and then function declarations until the
+   end of file *)
+let rec parse_program (toks : T.tok_loc list) : prog =
+  let (var_decs, toks) = parse_var_dec_list toks in
+  let rec parse_funs toks =
+    match toks with
+    | [] -> []
+    | _ ->
+      let (f, toks) = parse_func toks in
+      f :: parse_funs toks
+  in
+  { globals = var_decs; funcs = parse_funs toks }
 
 let stmts_to_stmt (s : stmt list) : stmt =
   match s with

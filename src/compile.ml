@@ -50,7 +50,7 @@ let filename =
   | Some filename ->
     filename
 
-let ast = FrontEnd.front_end filename false;;
+let ast = FrontEnd.front_end filename true;;
 
 let (_,opt_ast) = ConstProp.prop_stmts SourceAst.Idmap.empty ast;;
  (* printf "@\n%a@\n" SourceAst.pp_stmts opt_ast;; *)

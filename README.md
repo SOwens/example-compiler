@@ -100,7 +100,34 @@ stmts ::=
 | epsilon  
 | stmt stmts
 
-A program is just a stmts.
+typ ::=  
+| `int`          --- a 64-bit signed integer  
+| `bool`         --- a boolean  
+| `array` number --- an n dimensional array of 64-bit signed integers
+
+param ::=  
+| `(` identifier `:` type `)`
+
+params ::=  
+| epsilon  
+| param params
+
+var_dec ::=  
+| `let` identifier `:` typ `=` exp
+
+var_decs ::=  
+| epsilon  
+| var_dec var_decs
+
+func ::=  
+| `function` identifier params `:` typ `{` var_decs stmts `}`
+
+funcs ::=  
+| epsilon  
+| func funcs
+
+program ::=  
+| var_decs functions
 
 Loading the compiler in utop
 ----------------------------

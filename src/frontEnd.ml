@@ -65,8 +65,8 @@ module Std = struct
 
 end
 
-let front_end (filename : string) (print_intermediates : bool)
-  : SourceAst.stmt list =
+let front_end (filename : string) (print_intermediates : bool) : SourceAst.prog
+  =
   if Filename.check_suffix filename ".expl" then
     let input = Std.input_file filename in
     let toks = Tokens.lex input 0 1 in
@@ -76,10 +76,10 @@ let front_end (filename : string) (print_intermediates : bool)
       ();
     let ast = SourceAst.parse_program toks in
     if print_intermediates then
-      Format.printf "%a@\n@\n" (pp_list SourceAst.pp_stmt) ast
+      Format.printf "%a@\n@\n" SourceAst.pp_program ast
     else
       ();
-    TypeCheck.type_stmts None SourceAst.Idmap.empty ast;
+    TypeCheck.type_prog None SourceAst.Idmap.empty ast;
     TypeCheck.remove_loc ast
   else
     (Format.printf "Expects filename ending in .expl\n";

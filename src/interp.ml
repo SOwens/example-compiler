@@ -40,4 +40,4 @@ let _ =
     (print_string usage_msg;
      exit 1)
   | Some filename ->
-    AstInterp.interp_stmts SourceAst.Idmap.empty (FrontEnd.front_end filename false)
+    AstInterp.interp_prog SourceAst.Idmap.empty (FrontEnd.front_end filename true)
