@@ -1,11 +1,21 @@
 // Input a number and print its factorial
-{
-  c:=1
-  input x
-  z := 1
+
+function fact (x : int) : int {
+  let c : int = 1
+  let z : int = 1
   while 0 < x {
     z := z * x
     x := x - c
   }
-  output z
+  return z
+}
+
+function exec : int {
+  let x : int = 0
+  let y : int = 0
+  let r : int = 0
+  input x
+  y := fact(x)
+  output y
+  return r
 }
