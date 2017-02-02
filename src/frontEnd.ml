@@ -79,7 +79,7 @@ let front_end (filename : string) (print_intermediates : bool) : SourceAst.prog
       Format.printf "%a@\n@\n" SourceAst.pp_program ast
     else
       ();
-    TypeCheck.type_prog None SourceAst.Idmap.empty ast;
+    TypeCheck.type_prog ast;
     TypeCheck.remove_loc ast
   else
     (Format.printf "Expects filename ending in .expl\n";

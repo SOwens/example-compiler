@@ -81,12 +81,12 @@ atomic_exp ::=
 | number             --- Integer constant  
 | `true`             --- Boolean constant  
 | `false`            --- Boolean constant  
-| uop atomic_exp     --- Unary constant  
+| uop atomic_exp     --- Unary operation  
 | `array` indices    --- Array allocation  
 | `(` exp `)`        --- Parenthesised expression
 
 exp ::=  
-| atomic_exp op atomic_exp  
+| atomic_exp op atomic_exp --- Binary operation  
 | atomic_exp
 
 stmt ::=  
@@ -108,26 +108,17 @@ typ ::=
 | `bool`         --- a boolean  
 | `array` number --- an n dimensional array of 64-bit signed integers
 
-param ::=  
-| `(` identifier `:` type `)`
-
 params ::=  
 | epsilon  
-| param params
-
-var_dec ::=  
-| `let` identifier `:` typ `=` exp
+|  `(` identifier `:` type `)` params
 
 var_decs ::=  
 | epsilon  
-| var_dec var_decs
+| `let` identifier `:` typ `=` exp var_decs
 
-func ::=  
-| `function` identifier params `:` typ `{` var_decs stmts `}`
-
-funcs ::=  
+functions ::=  
 | epsilon  
-| func funcs
+| `function` identifier params `:` typ `{` var_decs stmts `}` funcs
 
 program ::=  
 | var_decs functions

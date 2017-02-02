@@ -21,5 +21,5 @@
 open SourceAst
 
 type t
-val type_prog : int option -> t Idmap.t -> prog -> unit
+val type_prog : prog -> unit
 val remove_loc : prog -> prog
