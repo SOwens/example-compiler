@@ -49,9 +49,6 @@ All numerical operations are on signed, 2s complement 64-bit integers.
 
 Multi-dimensional arrays are supported. Array elements are 64-bit integers.
 
-Variables aren't separately declared, but a variable is only in scope inside of
-the curly braces that it was first assigned in.
-
 op ::=  
 | `+`  --- Addition  
 | `-`  --- Subtraction  

@@ -76,6 +76,9 @@ let pp_call f fmt l =
   let rec pp fmt l =
     match l with
     | [] -> ()
+    | [h] ->
+      Format.fprintf fmt "%a"
+        f h
     | (h::t) ->
       Format.fprintf fmt "%a,@ %a"
         f h
@@ -204,7 +207,7 @@ type func = { fun_name : id; params : (id * typ) list; ret : typ;
               locals : var_dec list; body : stmt list }
 
 let pp_var_dec fmt var_dec =
-  Format.fprintf fmt "let@ %a@ :@ %a@ =@ %a"
+  Format.fprintf fmt "@[<2>let@ %a@ :@ %a@ =@ %a@]"
     pp_id var_dec.var_name
     pp_typ var_dec.typ
     pp_exp var_dec.init
@@ -231,7 +234,7 @@ let rec pp_params fmt (params : (id * typ) list) : unit =
       pp_params params
 
 let pp_func fmt func =
-  Format.fprintf fmt "@[<2>function@ %a@ %a@ :@ %a@ {@\n%a%a}]@\n"
+  Format.fprintf fmt "@[<2>function@ %a@ %a@ :@ %a@ {@\n%a%a}@]@\n"
     pp_id func.fun_name
     pp_params func.params
     pp_typ func.ret
