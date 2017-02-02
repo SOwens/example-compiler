@@ -36,7 +36,7 @@ See the `tests` directory for some example programs.
 The source language
 -------------------
 
-Keywords are `+ - * / | & << < > = || && ! := do while if then else input output true false array`
+Keywords are `+ - * / | & << < > = || && ! := do while if then else input output true false array return function let bool int`
 
 Identifiers are strings of letters, underscores, and digits (not starting with
 a digit) that are not keywords.
@@ -75,18 +75,18 @@ indices ::=
 | epsilon
 
 args ::=  
-| `(` exp `)`
+| `(` exp `)`  
 | `(` exp `)` args
 
 atomic_exp ::=  
-| identifier indices  
-| identifier args  
-| number  
-| `true`  
-| `false`  
-| uop atomic_exp  
-| `array` indices  
-| `(` exp `)`
+| identifier indices --- Variable use and array indexing  
+| identifier args    --- Function call  
+| number             --- Integer constant  
+| `true`             --- Boolean constant  
+| `false`            --- Boolean constant  
+| uop atomic_exp     --- Unary constant  
+| `array` indices    --- Array allocation  
+| `(` exp `)`        --- Parenthesised expression
 
 exp ::=  
 | atomic_exp op atomic_exp  
