@@ -74,8 +74,13 @@ indices ::=
 | `[` exp `]` indices  
 | epsilon
 
+args ::=  
+| `(` exp `)`
+| `(` exp `)` args
+
 atomic_exp ::=  
 | identifier indices  
+| identifier args  
 | number  
 | `true`  
 | `false`  
@@ -94,7 +99,8 @@ stmt ::=
 | `if` exp `then` stmt `else` stmt  
 | `{` stmts `}`  
 | `input` identifier  
-| `output` identifier
+| `output` identifier  
+| `return` identifier
 
 stmts ::=  
 | epsilon  

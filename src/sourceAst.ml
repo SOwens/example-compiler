@@ -56,6 +56,7 @@ module Idmap = Map.Make(Idord)
 (* AST of expressions *)
 type exp =
   | Ident of id * exp list
+  | Call of id * exp list
   | Num of int64
   | Bool of bool
   | Op of exp * T.op * exp
@@ -71,6 +72,18 @@ let rec pp_array_list f fmt l =
       f h
       (pp_array_list f) t
 
+let pp_call f fmt l =
+  let rec pp fmt l =
+    match l with
+    | [] -> ()
+    | (h::t) ->
+      Format.fprintf fmt "%a,@ %a"
+        f h
+        pp t
+  in
+  Format.fprintf fmt "(@[%a@])"
+    pp l
+
 let rec pp_exp fmt exp =
   match exp with
   | Ident (id, []) ->
@@ -80,6 +93,10 @@ let rec pp_exp fmt exp =
     Format.fprintf fmt "%a%a"
       pp_id id
       (pp_array_list pp_exp) es
+  | Call (id, es) ->
+    Format.fprintf fmt "%a%a"
+      pp_id id
+      (pp_call pp_exp) es
   | Num n -> Format.fprintf fmt "%Ld" n
   | Bool true -> Format.fprintf fmt "true"
   | Bool false -> Format.fprintf fmt "false"
@@ -108,6 +125,7 @@ type stmt =
   | Stmts of stmt list
   | In of id
   | Out of id
+  | Return of id
   | Loc of stmt * int (* annotate a statement with it's source line number *)
 
 let rec pp_stmt fmt stmt =
@@ -147,6 +165,9 @@ let rec pp_stmt fmt stmt =
       pp_id i
   | Out i ->
     Format.fprintf fmt "@[<2>output@ %a@]"
+      pp_id i
+  | Return i ->
+    Format.fprintf fmt "@[<2>return@ %a@]"
       pp_id i
   | Loc (s, _) ->
     pp_stmt fmt s
@@ -233,6 +254,9 @@ let parse_error (ln : int) (msg : string) : 'a =
 let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   match toks with
   | [] -> raise (BadInput "End of file while parsing an expression")
+  | (T.Ident i, ln) :: (T.Lparen, _) ::toks ->
+    let (args, toks) = parse_args ln toks in
+    (Call (Source i, args), toks)
   | (T.Ident i, ln) :: toks ->
     let (indices, toks) = parse_indices toks in
     (Ident (Source i, indices), toks)
@@ -274,6 +298,18 @@ and parse_indices (toks : T.tok_loc list) : exp list * T.tok_loc list =
      | _ -> parse_error l "'[' without matching ']'")
   | _ -> ([], toks)
 
+(* Parse 1 or more comma-separated expressions. Return them with the left over
+   tokens. End on a closing parenthesis *)
+and parse_args ln (toks : T.tok_loc list) : exp list * T.tok_loc list =
+  match parse_exp toks with
+  | (e, (T.Comma, _)::toks) ->
+    let (es, toks) = parse_args ln toks in
+    (e::es, toks)
+  | (e, (T.Rparen, _)::toks) ->
+    ([e], toks)
+  | _ ->
+    parse_error ln "expected ) or , in function argument"
+
 (* Convert the first statement in toks into an AST. Return it with the left
    over tokens *)
 let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
@@ -309,6 +345,7 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
     (Loc (Stmts (s_list), ln), toks)
   | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In (Source x), ln), toks)
   | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out (Source x), ln), toks)
+  | (T.Return, ln) :: (T.Ident x, _) :: toks -> (Loc (Return (Source x), ln), toks)
   | (_,ln) :: _ ->
     parse_error ln "Bad statement"
 

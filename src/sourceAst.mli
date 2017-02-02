@@ -27,6 +27,7 @@ module Idmap : Map.S with type key = id
 
 type exp =
   | Ident of id * exp list
+  | Call of id * exp list
   | Num of int64
   | Bool of bool
   | Op of exp * Tokens.op * exp
@@ -45,6 +46,7 @@ type stmt =
   | Stmts of stmt list
   | In of id
   | Out of id
+  | Return of id
   | Loc of stmt * int (* annotate a statement with it's source line number *)
 
 type typ =

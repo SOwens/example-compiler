@@ -62,6 +62,8 @@ type token =
   | Colon
   | Let
   | Function
+  | Return
+  | Comma
 
 type tok_loc = (token * int)
 
