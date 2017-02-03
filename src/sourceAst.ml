@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,6 +22,10 @@
 open Util
 module T = Tokens
 
+(* Type of identifiers. Source ones come from the original program, and Temp
+   ones come from intermediate compilation stages. This makes it easy to avoid
+   unintentional conflicts. The string on a Temp should name the stage that
+   introduced it. *)
 type id =
   | Source of string
   | Temp of string * int
@@ -34,6 +38,8 @@ let show_id i =
 let pp_id fmt i =
   Format.fprintf fmt "%s" (show_id i)
 
+(* Construct a total order on ids so that we can use them as keys in maps.
+   OCaml maps are implemented with balanced binary trees *)
 let compare_id id1 id2 =
   match (id1, id2) with
   | (Source s1, Source s2) -> String.compare s1 s2
@@ -51,6 +57,7 @@ module Idord = struct
   let compare = compare_id
 end
 
+(* Build Map module specialised to keys of type id *)
 module Idmap = Map.Make(Idord)
 
 (* AST of expressions *)

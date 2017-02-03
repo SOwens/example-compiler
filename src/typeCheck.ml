@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -81,7 +81,10 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
         type_error ln ("Call to undefined function " ^ show_id f)
     in
     let ts = List.map (type_exp ln env) args in
-    let rec check n pts ats =
+    (* A local function to check that the parameter and argument types match
+       up. Use n to keep track of which position, for the error message. Assume
+       that the lists are of the same length. *)
+    let rec check (n :int) (pts : t list) (ats : t list) : unit =
       match (pts, ats) with
       | ([], []) -> ()
       | (pt::pts, at::ats) ->
@@ -126,7 +129,9 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
     else
       type_error ln "Array dimension with non-integer type"
 
-(* Type check a statement. Raise BadInput if there is an error. *)
+(* Type check a statement. Raise BadInput if there is an error. return gives
+   the return type of the enclosing function. ln gives the current line number
+*)
 let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt) : unit =
   match stmt with
   | In i | Out i ->
@@ -145,7 +150,7 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt) : un
     let t1 = type_exp ln env (Ident (x, es)) in
     let t2 = type_exp ln env e in
     if t1 <> t2 then
-      type_error ln "Array assignment type mismatch"
+      type_error ln ("Assignment type mismatch: " ^ show_t t1 ^ " and " ^ show_t t2)
     else
       ()
   | DoWhile (s1, e, s2) ->
@@ -171,6 +176,7 @@ let source_typ_to_t t =
   | Bool -> Tbool
   | Array n -> Tarray n
 
+(* check a variable declaration, and add it to the environment *)
 let rec type_var_dec_list (env : env_t) (decs : var_dec list) : env_t =
   match decs with
   | [] -> env
@@ -192,6 +198,7 @@ let rec check_dup_params (ln : int option) params : unit =
     else
       check_dup_params ln params
 
+(* Check a function, and return its type *)
 let type_function (env : env_t) (f : func) : t list * t =
   check_dup_params f.loc f.params;
   let param_env =

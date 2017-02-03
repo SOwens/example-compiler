@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -91,7 +91,7 @@ type token =
   | Return
   | Comma
 
-let token_to_string token =
+let show_token token =
   match token with
   | Num i -> Int64.to_string i
   | Ident s -> s
@@ -123,19 +123,21 @@ let token_to_string token =
   | Comma -> ","
 
 let pp_token fmt token =
-  Format.fprintf fmt "%s" (token_to_string token)
+  Format.fprintf fmt "%s" (show_token token)
 
+(* Tokens annotated with which line number they appear on *)
 type tok_loc = (token * int)
 
 let pp_tok_loc fmt (t, l) =
   Format.fprintf fmt "(%a, %d)" pp_token t l
 
-let keywords =
+(* The mapping of keword strings to the corresponding tokens *)
+let keywords : (string * token) list =
   (* Derive the mapping from the to_string functions to avoid duplication *)
   (show_uop Not, Uop Not) ::
   List.map (fun o -> (show_op o, Op o))
     [Plus; Minus; Times; Div; Lt; Gt; Eq; And; Or; Lshift; BitOr; BitAnd] @
-  List.map (fun t -> (token_to_string t, t))
+  List.map (fun t -> (show_token t, t))
     [Do; While; If; Then; Else; Array; Assign; True; Input; Output; False;
      Lparen; Rparen; Lcurly; Rcurly; Lbrac; Rbrac; Int; Bool; Colon; Let;
      Return; Function; Comma]
@@ -158,6 +160,9 @@ let newline_re = Str.regexp "\n\\|\r\n"
 (* Read all the tokens from s, using pos to index into the string and line_n
    to track the current line number, for error reporting later on. Return them
    in a list. *)
+(* The lex function repeatedly finds which regexp matches the string, starting
+   from the current position, adds that token to the result, and then updates
+   the starting position to find the next token *)
 let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
   if pos >= String.length s then
     []
@@ -169,6 +174,7 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
     let tok = Strmap.find (Str.matched_string s) keyword_map in
     (tok, line_n) :: lex s (Str.match_end ()) line_n
   else if Str.string_match ident_re s pos then
+    (* Only try to match an ident if it wasn't a keyword *)
     (* Need the let because of OCaml's right-to-left evaluation *)
     let id = Str.matched_string s in
     (Ident id, line_n) :: lex s (Str.match_end ()) line_n
