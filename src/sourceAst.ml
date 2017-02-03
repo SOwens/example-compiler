@@ -201,10 +201,10 @@ let pp_typ fmt t =
   | Array n -> Format.fprintf fmt "array@ %d" n
 
 (* AST of variable and function declarations *)
-type var_dec = { var_name : id; typ : typ; init : exp }
+type var_dec = { var_name : id; typ : typ; init : exp; loc : int option }
 
 type func = { fun_name : id; params : (id * typ) list; ret : typ;
-              locals : var_dec list; body : stmt list }
+              locals : var_dec list; body : stmt list; loc : int option}
 
 let pp_var_dec fmt var_dec =
   Format.fprintf fmt "@[<2>let@ %a@ :@ %a@ =@ %a@]"
@@ -405,7 +405,7 @@ let parse_var_dec (toks : T.tok_loc list) : var_dec * T.tok_loc list =
     (match parse_typ toks with
      | (t, (T.Op T.Eq, _)::toks) ->
        let (e, toks) = parse_exp toks in
-       ({ var_name = Source x; typ = t; init = e }, toks)
+       ({ var_name = Source x; typ = t; init = e; loc = Some ln }, toks)
      | _ -> parse_error ln "variable declaration missing =")
   | (_,ln)::_ -> parse_error ln "bad variable declaration"
 
@@ -436,7 +436,8 @@ let parse_func (toks : T.tok_loc list) : func * T.tok_loc list =
               params = params;
               ret = t;
               locals = var_decs;
-              body = stmts }, toks)
+              body = stmts;
+              loc = Some ln }, toks)
          | _ -> parse_error ln "bad function declaration, missing {")
       | _ -> parse_error ln "bad function declaration, missing :")
   | (_,ln)::_ -> parse_error ln "bad function declaration"

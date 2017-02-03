@@ -55,10 +55,10 @@ type typ =
   (* An int array with the given number of dimensions *)
   | Array of int
 
-type var_dec = { var_name : id; typ : typ; init : exp }
+type var_dec = { var_name : id; typ : typ; init : exp; loc : int option }
 
 type func = { fun_name : id; params : (id * typ) list; ret : typ;
-              locals : var_dec list; body : stmt list }
+              locals : var_dec list; body : stmt list; loc : int option }
 
 type prog = { globals : var_dec list; funcs : func list }
 

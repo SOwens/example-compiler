@@ -171,17 +171,16 @@ let source_typ_to_t t =
   | Bool -> Tbool
   | Array n -> Tarray n
 
-(* TODO: Add source location and error message *)
 let rec type_var_dec_list (env : env_t) (decs : var_dec list) : env_t =
   match decs with
   | [] -> env
   | v::decs ->
-    let t = type_exp None env v.init in
+    let t = type_exp (v.loc) env v.init in
     if t = source_typ_to_t v.typ then
       let new_env = { env with vars = Idmap.add v.var_name t env.vars } in
       type_var_dec_list new_env decs
     else
-      type_error None ""
+      type_error (v.loc) ("variable initialisation with type " ^ show_t t)
 
 (* Check for duplicate parameters. Raise an exception if found *)
 let rec check_dup_params (ln : int option) params : unit =
@@ -193,9 +192,8 @@ let rec check_dup_params (ln : int option) params : unit =
     else
       check_dup_params ln params
 
-(* TODO: Add source location and error message *)
 let type_function (env : env_t) (f : func) : t list * t =
-  check_dup_params None f.params;
+  check_dup_params f.loc f.params;
   let param_env =
     List.fold_right
       (fun (i, t) env -> { env with vars = Idmap.add i (source_typ_to_t t) env.vars })
@@ -232,5 +230,4 @@ and remove_loc_one s =
   | s -> s
 
 let remove_loc (p : prog) : prog =
-  (* TODO *)
-  p
+  { p with funcs = List.map (fun f -> { f with body = remove_loc_stmts f.body } ) p.funcs }
