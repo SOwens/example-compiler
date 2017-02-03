@@ -198,6 +198,16 @@ let rec check_dup_params (ln : int option) params : unit =
     else
       check_dup_params ln params
 
+let rec get_function_types (funcs : func list) (fun_env : (t list * t) Idmap.t) :
+  (t list * t) Idmap.t =
+  match funcs with
+  | [] -> fun_env
+  | f::funcs ->
+    get_function_types funcs
+      (Idmap.add f.fun_name (List.map (fun (_,t) -> source_typ_to_t t) f.params,
+                             source_typ_to_t f.ret)
+         fun_env)
+
 (* Check a function, and return its type *)
 let type_function (env : env_t) (f : func) : t list * t =
   check_dup_params f.loc f.params;
