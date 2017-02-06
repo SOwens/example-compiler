@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,7 +16,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* An interpreter for ASTs *)
+(* An interpreter for ASTs. This is meta circular in the sense that we use
+   OCaml refs for mutable variables, and we represent arrays with mutable OCaml
+   arrays. We also model function returns with exceptions. *)
 
 open Util
 open SourceAst
@@ -103,107 +105,141 @@ let do_uop uop (n : int64) : int64 =
   | T.Not ->
     bool_to_int64 (not (int64_to_bool n))
 
+(* The environment will have the code of all of the functions that we can call,
+   it will also keep the variable bindings in a map of OCaml references.
+   Assignments to a variables will be interpreted as assignments to the
+   corresponding reference. Note that an assignment to a variable (of scalar or
+   array type) mutates the binding for that variable in the environment,
+   whereas an assignment to an array element (i.e., an array update), actually
+   changes the array value without modifying the environment binding for the
+   array.
+*)
+type env_t = { funs : func Idmap.t; vars : val_t ref Idmap.t }
+
+(* To model return control flow *)
+exception Return_exn of val_t
+
+(* Add the function's arguments to the environment env at a call sight. Assume
+   that the two input lists are the same length. This is ensured by the type
+   checker. We also know there are no duplicate parameter names. *)
+let rec add_arguments (params : (id * _) list) (args : val_t list) (env : env_t)
+  : env_t =
+  match (params, args) with
+  | ([], []) -> env
+  | ((x,_)::params, v::args) ->
+    (* Allocate a mutable reference to store the parameter's value in. Then the
+       function's body can assign to the variable by changing the binding. *)
+    let binding = ref v in
+    add_arguments params args { env with vars = Idmap.add x binding env.vars }
+  | (_, _) ->
+    assert false
+
 (* Compute the value of an expression *)
-let rec interp_exp (store : store_t) (e : exp) : val_t =
+let rec interp_exp (env : env_t) (e : exp) : val_t =
   match e with
   | Ident (i, []) ->
-    Idmap.find i store (* i will be in the store in a well-typed program *)
+    !(Idmap.find i env.vars) (* i will be in the environment in a well-typed program *)
   | Ident (i, iexps) ->
-    let (sizes, a) = val_t_to_array (Idmap.find i store) in
+    let (sizes, a) = val_t_to_array !(Idmap.find i env.vars) in
     let indices =
-      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
+      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp env e))))
         iexps
     in
     (match array_address sizes indices with
      | Some x -> Vint (Array.get a x)
      | None -> raise (Crash "array index out of bounds"))
+  | Call (f, args) ->
+    (* f will be in the environment in a well-typed program *)
+    let func = Idmap.find f env.funs in
+    let arg_vals = List.map (interp_exp env) args in
+    let new_env = add_arguments func.params arg_vals env in
+    (* TODO evaluate local variables *)
+    (try
+       List.iter (interp_stmt new_env) func.body;
+       (* We know this cannot happen because of the type checker, each path in
+          each function must have a return. Otherwise, we would have to return
+          a default value *of the right type* *)
+       assert false
+     with Return_exn v -> v)
   | Num n -> Vint n
   | Bool b -> Vint (bool_to_int64 b)
   | Op (e1, T.And, e2) ->
-    (match interp_exp store e1 with
+    (match interp_exp env e1 with
      | Vint n ->
        if int64_to_bool n then
-         interp_exp store e2
+         interp_exp env e2
        else
          Vint n
      | _ -> raise TypeError)
    | Op (e1, T.Or, e2) ->
-    (match interp_exp store e1 with
+    (match interp_exp env e1 with
      | Vint n ->
        if int64_to_bool n then
          Vint n
        else
-         interp_exp store e2
+         interp_exp env e2
      | _ -> raise TypeError)
   | Op (e1, op, e2) ->
-    (match (interp_exp store e1, interp_exp store e2) with
+    (match (interp_exp env e1, interp_exp env e2) with
      | (Vint n1, Vint n2) -> Vint (do_op op n1 n2)
      | _ -> raise TypeError)
   | Uop (uop, e) ->
-    (match interp_exp store e with
+    (match interp_exp env e with
      | Vint n -> Vint (do_uop uop n)
      | _ -> raise TypeError)
   | Array iexps ->
     let indices =
-      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
+      List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp env e))))
         iexps
     in
     Varray (indices,
             Array.make (List.fold_right (fun x y -> x * y) indices 1) 0L)
 
 (* Run a statement *)
-let rec interp_stmt (store : store_t) (s : stmt) : store_t =
+and interp_stmt (env : env_t) (s : stmt) : unit =
   match s with
   | Assign (i, [], e) ->
-    let v = interp_exp store e in
-    Idmap.add i v store
+    let v = interp_exp env e in
+    Idmap.find i env.vars := v
   | Assign (i, iexps, e) ->
-    (match Idmap.find i store with
+    (match !(Idmap.find i env.vars) with
      | Varray (sizes, a) ->
        (let indices =
-          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp store e))))
+          List.map (fun e -> (Int64.to_int (val_t_to_int (interp_exp env e))))
             iexps
         in
         match array_address sizes indices with
         | None -> raise (Crash "array index out of bounds")
         | Some x ->
-          let v = val_t_to_int (interp_exp store e) in
-          Array.set a x v;
-          store)
+          let v = val_t_to_int (interp_exp env e) in
+          Array.set a x v)
      | Vint _ -> raise TypeError)
   | DoWhile (head_s, e, body_s) ->
-    let s1 = interp_stmt store head_s in
-    if not (int64_to_bool (val_t_to_int (interp_exp s1 e))) then
-      s1
+    interp_stmt env head_s;
+    if int64_to_bool (val_t_to_int (interp_exp env e)) then
+      (interp_stmt env body_s;
+       interp_stmt env s)
     else
-      let s2 = interp_stmt s1 body_s in
-      interp_stmt s2 s
+      ()
   | Ite (e, s1, s2) ->
-    if int64_to_bool (val_t_to_int (interp_exp store e)) then
-      interp_stmt store s1
+    if int64_to_bool (val_t_to_int (interp_exp env e)) then
+      interp_stmt env s1
     else
-      interp_stmt store s2
+      interp_stmt env s2
   | Stmts sl ->
-    interp_stmts store sl
+    List.iter (interp_stmt env) sl
   | In i ->
     Printf.printf "> ";
     (try
        let n = Int64.of_string (read_line ()) in
-       Idmap.add i (Vint n) store
+       Idmap.find i env.vars := Vint n
      with Failure _ -> raise (Crash "not a 64-bit integer"))
   | Out i ->
-    begin
-      print_string (Int64.to_string (val_t_to_int (Idmap.find i store)));
-      print_newline ();
-      store
-    end
-  | Loc (s, _) -> interp_stmt store s
-
-and interp_stmts (store : store_t) (sl : stmt list) : store_t = match sl with
-  | [] -> store
-  | s::sl ->
-    let store2 = interp_stmt store s in
-    interp_stmts store2 sl;;
+    (print_string (Int64.to_string (val_t_to_int !(Idmap.find i env.vars)));
+     print_newline ())
+  | Return i ->
+    raise (Return_exn !(Idmap.find i env.vars))
+  | Loc (s, _) -> interp_stmt env s
 
 let interp_prog (store : store_t) (sl : prog) : store_t =
   (* TODO *)
