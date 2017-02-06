@@ -132,7 +132,8 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t =
 (* Type check a statement. Raise BadInput if there is an error. return gives
    the return type of the enclosing function. ln gives the current line number
 *)
-let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt) : unit =
+let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt)
+  : unit =
   match stmt with
   | In i | Out i ->
     let t = type_exp ln env (Ident(i, [])) in
@@ -143,14 +144,16 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt) : un
   | Return i ->
     let t = type_exp ln env (Ident(i, [])) in
     if t <> return then
-      type_error ln ("return has type " ^ show_t t ^ " in a function with return type " ^ show_t return)
+      type_error ln ("return has type " ^ show_t t ^ " in a function with
+                     return type " ^ show_t return)
     else
       ()
   | Assign (x, es, e) ->
     let t1 = type_exp ln env (Ident (x, es)) in
     let t2 = type_exp ln env e in
     if t1 <> t2 then
-      type_error ln ("Assignment type mismatch: " ^ show_t t1 ^ " and " ^ show_t t2)
+      type_error ln ("Assignment type mismatch: " ^ show_t t1 ^ " and " ^
+                     show_t t2)
     else
       ()
   | DoWhile (s1, e, s2) ->
@@ -170,13 +173,27 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt) : un
   | Loc (s, ln') ->
     type_stmt (Some ln') env return s
 
-let source_typ_to_t t =
+let source_typ_to_t (t : SourceAst.typ) : t =
   match t with
   | Int -> Tint
   | Bool -> Tbool
   | Array n -> Tarray n
 
-(* check a variable declaration, and add it to the environment *)
+(* Get the declared types of all of the parameters. Raise an exception if a
+   duplicate name is found, using the location ln. Accumulate the answer in
+   param_env. *)
+let rec get_param_types (ln : int option) (params : (id * typ) list)
+    (param_env : t Idmap.t)
+  : t Idmap.t =
+  match params with
+  | [] -> param_env
+  | (x,t)::params ->
+    if Idmap.mem x param_env then
+      type_error ln ("Duplicate function parameter " ^ show_id x)
+    else
+      get_param_types ln params (Idmap.add x (source_typ_to_t t) param_env)
+
+(* Check a list of variable declarations, and add their types to env. *)
 let rec type_var_dec_list (env : env_t) (decs : var_dec list) : env_t =
   match decs with
   | [] -> env
@@ -188,49 +205,65 @@ let rec type_var_dec_list (env : env_t) (decs : var_dec list) : env_t =
     else
       type_error (v.loc) ("variable initialisation with type " ^ show_t t)
 
-(* Check for duplicate parameters. Raise an exception if found *)
-let rec check_dup_params (ln : int option) params : unit =
-  match params with
-  | [] -> ()
-  | (i,_) :: params ->
-    if List.mem_assoc i params then
-      type_error ln ("Duplicate function parameter " ^ show_id i)
-    else
-      check_dup_params ln params
+let merge_keep_first _ (x : 'a option) (y : 'a option) : 'a option =
+  match (x,y) with
+  | (None, None) -> None
+  | (Some x, Some y) -> Some x
+  | (Some x, None) -> Some x
+  | (None, Some y) -> Some y
 
-let rec get_function_types (funcs : func list) (fun_env : (t list * t) Idmap.t) :
-  (t list * t) Idmap.t =
+(* Check a function. *)
+let type_function (env : env_t) (f : func) : unit =
+  let param_env = get_param_types f.loc f.params Idmap.empty in
+  let new_env =
+    type_var_dec_list
+      (* The local variables' initialisers can refer to the parameters *)
+      { env with vars = Idmap.merge merge_keep_first param_env env.vars }
+      f.locals
+  in
+  List.iter (type_stmt None new_env (source_typ_to_t f.ret)) f.body
+
+(* Get the declared types of all of the variables.  Raise an exception if a
+   duplicate is found. Accumulate the answer in var_env. *)
+let rec get_var_types (vars : var_dec list) (var_env : t Idmap.t)
+  : t Idmap.t =
+  match vars with
+  | [] -> var_env
+  | v::vars ->
+    if Idmap.mem v.var_name var_env then
+      type_error v.loc ("Duplicate variable definition " ^ show_id v.var_name)
+    else
+      get_var_types vars
+        (Idmap.add v.var_name (source_typ_to_t v.typ) var_env)
+
+(* Get the declared types of all of the functions. Raise an exception if a
+   duplicate is found. Accumulate the answer in fun_env. *)
+let rec get_function_types (funcs : func list) (fun_env : (t list * t) Idmap.t)
+  : (t list * t) Idmap.t =
   match funcs with
   | [] -> fun_env
   | f::funcs ->
-    get_function_types funcs
-      (Idmap.add f.fun_name (List.map (fun (_,t) -> source_typ_to_t t) f.params,
-                             source_typ_to_t f.ret)
-         fun_env)
-
-(* Check a function, and return its type *)
-let type_function (env : env_t) (f : func) : t list * t =
-  check_dup_params f.loc f.params;
-  let param_env =
-    List.fold_right
-      (fun (i, t) env -> { env with vars = Idmap.add i (source_typ_to_t t) env.vars })
-      f.params
-      env
-  in
-  let new_env = type_var_dec_list param_env f.locals in
-  List.iter (type_stmt None new_env (source_typ_to_t f.ret)) f.body;
-  (List.map (fun (_, t) -> source_typ_to_t t) f.params,
-   source_typ_to_t f.ret)
+    if Idmap.mem f.fun_name fun_env then
+      type_error f.loc ("Duplicate function definition " ^ show_id f.fun_name)
+    else
+      get_function_types funcs
+        (Idmap.add f.fun_name
+           (List.map (fun (_,t) -> source_typ_to_t t) f.params,
+            source_typ_to_t f.ret)
+           fun_env)
 
 let type_prog (p : prog) : unit =
-  let env = type_var_dec_list { funs = Idmap.empty; vars = Idmap.empty } p.globals in
-  ignore (
-    List.fold_left
-      (fun env f ->
-         let (arg_t, ret_t) = type_function env f in
-         { env with funs = Idmap.add f.fun_name (arg_t, ret_t) env.funs })
-      env
-      p.funcs)
+  (* Get the types of the globals and functions. *)
+  let env =
+    { funs = get_function_types p.funcs Idmap.empty;
+      vars = get_var_types p.globals Idmap.empty }
+  in
+  (* Check the function bodies and global initialisations in the environment
+     with types for all of the globals and functions. This means that the
+     top-level is one recursive scope and each function body and global
+     initialisation can refer to any of the others (or itself). *)
+  ignore (type_var_dec_list env p.globals);
+  ignore (List.iter (type_function env) p.funcs)
 
 let rec remove_loc_stmts (stmts : stmt list) : stmt list =
   List.map remove_loc_one stmts
