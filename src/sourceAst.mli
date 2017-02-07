@@ -19,8 +19,15 @@
 (* The language's AST, and a predictive, recursive descent parser. See the
    ../README.md for the grammar. *)
 
+type scope =
+  | Global
+  | Parameter
+  | Local
+
+val compare_scope : scope -> scope -> int
+
 type id =
-  | Source of string
+  | Source of string * scope option
   | Temp of string * int
 
 module Idmap : Map.S with type key = id

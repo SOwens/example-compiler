@@ -22,7 +22,7 @@
 type var =
   | Vreg of int
   | Stack of int
-  | NamedSource of string
+  | NamedSource of string * SourceAst.scope
   | NamedTmp of string * int
 
 module Varset : sig

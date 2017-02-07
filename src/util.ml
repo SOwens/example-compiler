@@ -69,3 +69,10 @@ let option_map f x =
   match x with
   | None -> None
   | Some y -> Some (f y)
+
+let option_compare c o1 o2 =
+  match (o1, o2) with
+  | (None, None) -> 0
+  | (Some _, None) -> 1
+  | (None, Some _) -> -1
+  | (Some x, Some y) -> c x y

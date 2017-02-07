@@ -25,14 +25,19 @@ module S = SourceAst
 type var =
   | Vreg of int
   | Stack of int
-  | NamedSource of string
+  | NamedSource of string * SourceAst.scope
   | NamedTmp of string * int
 
 let compare_var v1 v2 =
   match (v1, v2) with
   | (Vreg i1, Vreg i2) -> compare i1 i2
   | (Stack i1, Stack i2) -> compare i1 i2
-  | (NamedSource s1, NamedSource s2) -> String.compare s1 s2
+  | (NamedSource (s1, scope1), NamedSource (s2, scope2)) ->
+    let c = SourceAst.compare_scope scope1 scope2 in
+    if c = 0 then
+      String.compare s1 s2
+    else
+      c
   | (NamedTmp (s1, i1), NamedTmp (s2, i2)) ->
     let c = String.compare s1 s2 in
     if c = 0 then
@@ -47,7 +52,7 @@ let show_var v =
   match v with
   | Vreg i -> "r" ^ string_of_int i
   | Stack i -> "s" ^ string_of_int i
-  | NamedSource s -> s
+  | NamedSource (s,_) -> s
   | NamedTmp (s, i) -> "_" ^ s ^ string_of_int i
 
 let pp_var fmt v =
@@ -198,8 +203,6 @@ let cfg_to_graphviz fmt (cfg : cfg) : unit =
               entry.bnum
               (fun fmt e ->
                  if entry.bnum = 0 then
-                   Format.fprintf fmt "EXIT\\l"
-                 else if entry.bnum = 1 then
                    Format.fprintf fmt "ENTRY\\l"
                  else
                    ();
@@ -222,7 +225,9 @@ let cfg_to_graphviz fmt (cfg : cfg) : unit =
 
 let id_to_var (i : S.id) : var =
   match i with
-  | S.Source s -> NamedSource s
+  | S.Source (s, None) ->
+    raise (InternalError "un-scoped source identifier")
+  | S.Source (s, Some (scope)) -> NamedSource (s, scope)
   | S.Temp (s, i) -> NamedTmp (s, i)
 
 let bool_to_num b =

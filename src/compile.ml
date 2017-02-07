@@ -57,7 +57,7 @@ open SourceAst
 (* Build a main function that just runs the initialisation of all of the
    globals *)
 let main_function =
-  { fun_name = Source "main"; params = []; ret = Int;
+  { fun_name = Source ("main", None); params = []; ret = Int;
     locals = [];
     body = List.map (fun d -> Assign (d.var_name, [], d.init)) prog.globals;
     loc = None }

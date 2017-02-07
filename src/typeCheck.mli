@@ -21,5 +21,4 @@
 open SourceAst
 
 type t
-val type_prog : prog -> unit
-val remove_loc : prog -> prog
+val type_prog : prog -> prog

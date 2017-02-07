@@ -25,14 +25,21 @@ module T = Tokens
 (* Type of identifiers. Source ones come from the original program, and Temp
    ones come from intermediate compilation stages. This makes it easy to avoid
    unintentional conflicts. The string on a Temp should name the stage that
-   introduced it. *)
+   introduced it. The scope indicates where the identifier is bound, if that is
+   known. We expect the parse to generate unknown scopes and for the type
+   checker to fill them in. All Temps are considered local in scope. *)
+type scope =
+  | Global
+  | Parameter
+  | Local
+
 type id =
-  | Source of string
+  | Source of string * scope option
   | Temp of string * int
 
 let show_id i =
   match i with
-  | Source s -> s
+  | Source (s, _) -> s
   | Temp (s,i) -> "_tmp_" ^ s ^ string_of_int i
 
 let pp_id fmt i =
@@ -40,9 +47,24 @@ let pp_id fmt i =
 
 (* Construct a total order on ids so that we can use them as keys in maps.
    OCaml maps are implemented with balanced binary trees *)
+let scope_to_int s =
+  match s with
+  | Global -> 0
+  | Parameter -> 1
+  | Local -> 2
+
+let compare_scope s1 s2 = compare (scope_to_int s1) (scope_to_int s2)
+
 let compare_id id1 id2 =
   match (id1, id2) with
-  | (Source s1, Source s2) -> String.compare s1 s2
+  | (Source (s1, scope1), Source (s2, scope2)) ->
+    let c =
+      option_compare compare_scope scope1 scope2
+    in
+    if c = 0 then
+      String.compare s1 s2
+    else
+      c
   | (Temp _, Source _) -> -1
   | (Source _, Temp _) -> 1
   | (Temp (s1,i1), Temp (s2,i2)) ->
@@ -266,10 +288,10 @@ let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   | [] -> raise (BadInput "End of file while parsing an expression")
   | (T.Ident i, ln) :: (T.Lparen, _) ::toks ->
     let (args, toks) = parse_args ln toks in
-    (Call (Source i, args), toks)
+    (Call (Source (i,None), args), toks)
   | (T.Ident i, ln) :: toks ->
     let (indices, toks) = parse_indices toks in
-    (Ident (Source i, indices), toks)
+    (Ident (Source (i,None), indices), toks)
   | (T.Num n, _) :: toks -> (Num n, toks)
   | (T.True, _) :: toks -> (Bool true, toks)
   | (T.False, _) :: toks -> (Bool false, toks)
@@ -329,7 +351,7 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
     (match parse_indices toks with
      | (indices, (T.Assign, _) :: toks) ->
        let (e, toks) = parse_exp toks in
-       (Loc (Assign (Source x, indices, e), ln), toks)
+       (Loc (Assign (Source (x, None), indices, e), ln), toks)
      |_ -> parse_error ln "expected ':=' after identifier")
   | (T.While, ln) :: toks ->
     let (e, toks) = parse_exp toks in
@@ -353,9 +375,9 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
   | (T.Lcurly, ln) :: toks ->
     let (s_list, toks) = parse_stmt_list toks in
     (Loc (Stmts (s_list), ln), toks)
-  | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In (Source x), ln), toks)
-  | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out (Source x), ln), toks)
-  | (T.Return, ln) :: (T.Ident x, _) :: toks -> (Loc (Return (Source x), ln), toks)
+  | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In (Source (x,None)), ln), toks)
+  | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out (Source (x,None)), ln), toks)
+  | (T.Return, ln) :: (T.Ident x, _) :: toks -> (Loc (Return (Source (x,None)), ln), toks)
   | (_,ln) :: _ ->
     parse_error ln "Bad statement"
 
@@ -387,7 +409,7 @@ let parse_param (toks : T.tok_loc list) : (id * typ) * T.tok_loc list =
   | (T.Lparen, ln) :: (T.Ident x, _) :: (T.Colon,_) :: toks ->
     (match parse_typ toks with
      | (t, (T.Rparen, _)::toks) ->
-       ((Source x, t), toks)
+       ((Source (x,None), t), toks)
      | _ -> parse_error ln "function parameter missing )")
   | (_,ln)::_ -> parse_error ln "bad function parameter"
 
@@ -412,7 +434,7 @@ let parse_var_dec (toks : T.tok_loc list) : var_dec * T.tok_loc list =
     (match parse_typ toks with
      | (t, (T.Op T.Eq, _)::toks) ->
        let (e, toks) = parse_exp toks in
-       ({ var_name = Source x; typ = t; init = e; loc = Some ln }, toks)
+       ({ var_name = Source (x,None); typ = t; init = e; loc = Some ln }, toks)
      | _ -> parse_error ln "variable declaration missing =")
   | (_,ln)::_ -> parse_error ln "bad variable declaration"
 
@@ -440,7 +462,7 @@ let parse_func (toks : T.tok_loc list) : func * T.tok_loc list =
            | (t, (T.Lcurly, _) :: toks) ->
              let (var_decs, toks) = parse_var_dec_list toks in
              let (stmts, toks) = parse_stmt_list toks in
-             ({ fun_name = Source x;
+             ({ fun_name = Source (x,None);
                 params = params;
                 ret = t;
                 locals = var_decs;
