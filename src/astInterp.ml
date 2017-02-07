@@ -45,6 +45,7 @@ let val_t_to_int (v : val_t) : int64 =
 
 let val_t_to_array (v : val_t) : int list * int64 array =
   match v with
+  | Vint 0L -> raise (Crash "null pointer exception")
   | Vint _ -> raise TypeError
   | Varray (dims, a) -> (dims, a)
 
@@ -132,7 +133,7 @@ let rec add_arguments (params : (id * _) list) (args : val_t list) (env : env_t)
     let binding = ref v in
     add_arguments params args { env with vars = Idmap.add x binding env.vars }
   | (_, _) ->
-    assert false
+    raise TypeError
 
 (* Compute the value of an expression *)
 let rec interp_exp (env : env_t) (e : exp) : val_t =
@@ -159,7 +160,7 @@ let rec interp_exp (env : env_t) (e : exp) : val_t =
        (* We know this cannot happen because of the type checker, each path in
           each function must have a return. Otherwise, we would have to return
           a default value *of the right type* *)
-       assert false
+       raise TypeError
      with Return_exn v -> v)
   | Num n -> Vint n
   | Bool b -> Vint (bool_to_int64 b)
@@ -224,6 +225,7 @@ and interp_stmt (env : env_t) (s : stmt) : unit =
         | Some x ->
           let v = val_t_to_int (interp_exp env e) in
           Array.set a x v)
+     | Vint 0L -> raise (Crash "null pointer exception")
      | Vint _ -> raise TypeError)
   | DoWhile (head_s, e, body_s) ->
     interp_stmt env head_s;
