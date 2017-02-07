@@ -79,7 +79,12 @@ let front_end (filename : string) (print_intermediates : bool) : SourceAst.prog
       Format.printf "%a@\n@\n" SourceAst.pp_program ast
     else
       ();
-    TypeCheck.type_prog ast
+    let ast2 = TypeCheck.type_prog ast in
+    if print_intermediates then
+      Format.printf "%a@\n@\n" SourceAst.pp_program ast2
+    else
+      ();
+    ast2
   else
     (Format.printf "Expects filename ending in .expl\n";
      exit 1)

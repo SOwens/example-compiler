@@ -226,8 +226,9 @@ let cfg_to_graphviz fmt (cfg : cfg) : unit =
 let id_to_var (i : S.id) : var =
   match i with
   | S.Source (s, None) ->
-    raise (InternalError "un-scoped source identifier")
-  | S.Source (s, Some (scope)) -> NamedSource (s, scope)
+    raise (InternalError ("un-scoped source identifier in blockStructure: " ^
+                          S.show_id (S.Source (s, None))))
+  | S.Source (s, Some scope) -> NamedSource (s, scope)
   | S.Temp (s, i) -> NamedTmp (s, i)
 
 let bool_to_num b =

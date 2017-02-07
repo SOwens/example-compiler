@@ -37,9 +37,16 @@ type id =
   | Source of string * scope option
   | Temp of string * int
 
+let show_scope s =
+  match s with
+  | Global -> "Global"
+  | Parameter -> "Parameter"
+  | Local -> "Local"
+
 let show_id i =
   match i with
-  | Source (s, _) -> s
+  | Source (s, None) -> s
+  | Source (s, Some scope) -> s ^ "." ^ show_scope scope
   | Temp (s,i) -> "_tmp_" ^ s ^ string_of_int i
 
 let pp_id fmt i =

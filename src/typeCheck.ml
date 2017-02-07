@@ -239,7 +239,7 @@ let rec type_var_dec_list (s : scope) (env : env_t) (decs : var_dec list)
     if t = source_typ_to_t v.typ then
       let new_env = { env with vars = Idmap.add v.var_name (t,s) env.vars } in
       let (env', decs') = type_var_dec_list s new_env decs in
-      (env', { v with init = init' } :: decs')
+      (env', { v with var_name = add_scope v.var_name s; init = init' } :: decs')
     else
       type_error (v.loc) ("variable initialisation with type " ^ show_t t)
 
@@ -285,7 +285,8 @@ let type_function (env : env_t) (f : func) : func =
   if not (check_return_paths f.body) then
     type_error f.loc "function might not return"
   else
-    { f with locals = locals'; body = body' }
+    { f with params = List.map (fun (i,t) -> (add_scope i Parameter, t)) f.params;
+             locals = locals'; body = body' }
 
 (* Get the declared types of all of the variables.  Raise an exception if a
    duplicate is found. Accumulate the answer in var_env. *)

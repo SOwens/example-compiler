@@ -50,7 +50,7 @@ let filename =
   | Some filename ->
     filename
 
-let prog = FrontEnd.front_end filename false;;
+let prog = FrontEnd.front_end filename true;;
 
 open SourceAst
 
