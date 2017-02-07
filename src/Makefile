@@ -2,7 +2,7 @@ PACKAGES = str
 
 FILES = util tokens sourceAst typeCheck frontEnd constProp unnestExp \
 blockStructure shrinkImmediates liveVarAnalysis regAlloc lineariseCfg x86 \
-instrSelX86 astInterp blockInterp interp compile
+instrSelX86 compileFunction astInterp blockInterp interp compile
 
 FILES_ML = $(addsuffix .ml,$(FILES))
 FILES_MLI = $(addsuffix .mli,$(FILES))

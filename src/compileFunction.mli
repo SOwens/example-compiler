@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,28 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* Driver for interpreter executable. *)
+(* Compiler for a single function *)
 
-let filename = ref None;;
+val compile_fun : SourceAst.func -> SourceAst.id * X86.instruction list
 
-let usage_msg =
-  "example interpreter \nexample usage:       interp.byte test.expl\n";;
-
-let _ =
-  Arg.parse []
-    (fun s ->
-       match !filename with
-       | None ->
-         filename := Some s
-       | Some s' ->
-         (Format.printf "Error: given multiple files to run: %s and %s\n" s' s;
-          exit 1))
-    usage_msg;;
-
-let _ =
-  match !filename with
-  | None ->
-    (print_string usage_msg;
-     exit 1)
-  | Some filename ->
-    AstInterp.interp_prog (FrontEnd.front_end filename false)
