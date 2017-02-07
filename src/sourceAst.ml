@@ -435,17 +435,20 @@ let parse_func (toks : T.tok_loc list) : func * T.tok_loc list =
   | (T.Function, ln) :: (T.Ident x, _) :: toks ->
      (match parse_param_list toks with
       | (params, (T.Colon, _) :: toks) ->
-        (match parse_typ toks with
-         | (t, (T.Lcurly, _) :: toks) ->
-           let (var_decs, toks) = parse_var_dec_list toks in
-           let (stmts, toks) = parse_stmt_list toks in
-           ({ fun_name = Source x;
-              params = params;
-              ret = t;
-              locals = var_decs;
-              body = stmts;
-              loc = Some ln }, toks)
-         | _ -> parse_error ln "bad function declaration, missing {")
+        if List.length params <> 0 then
+          (match parse_typ toks with
+           | (t, (T.Lcurly, _) :: toks) ->
+             let (var_decs, toks) = parse_var_dec_list toks in
+             let (stmts, toks) = parse_stmt_list toks in
+             ({ fun_name = Source x;
+                params = params;
+                ret = t;
+                locals = var_decs;
+                body = stmts;
+                loc = Some ln }, toks)
+           | _ -> parse_error ln "bad function declaration, missing {")
+        else
+          parse_error ln "functions must have at least 1 parameter"
       | _ -> parse_error ln "bad function declaration, missing :")
   | (_,ln)::_ -> parse_error ln "bad function declaration"
 

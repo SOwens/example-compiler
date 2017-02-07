@@ -109,7 +109,7 @@ typ ::=
 | `array` number --- an n dimensional array of 64-bit signed integers
 
 params ::=  
-| epsilon  
+| `(` identifier `:` type `)`  
 |  `(` identifier `:` type `)` params
 
 var_decs ::=  

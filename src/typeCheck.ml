@@ -17,7 +17,6 @@
 *)
 
 (* The type checker *)
-(* TODO check that each function must return *)
 
 open Util
 open SourceAst
@@ -213,6 +212,27 @@ let merge_keep_first _ (x : 'a option) (y : 'a option) : 'a option =
   | (Some x, None) -> Some x
   | (None, Some y) -> Some y
 
+(* Determine whether that each control-flow path through the stmts must include
+   a return.  This was we know that a function cannot fall off the end, without
+   returning a value of the correct type. *)
+let rec check_return_paths (stmts : stmt list) : bool =
+  match stmts with
+  | [] -> false
+  | Return _ :: _ -> true
+  | s::stmts ->
+    if check_return_paths stmts then
+      true
+    else (* The remainder might not return, so we must, but we arent'a return *)
+      match s with
+      | Return _ -> assert false
+      | In _ | Out _ | Assign _ -> false
+      | Loc (s,_) -> check_return_paths [s]
+      | Ite (e,s1,s2) ->
+        check_return_paths [s1] && check_return_paths [s2]
+      | DoWhile (s1, e, s2) ->
+        check_return_paths [s1]
+      | Stmts s -> check_return_paths s
+
 (* Check a function. *)
 let type_function (env : env_t) (f : func) : unit =
   let param_env = get_param_types f.loc f.params Idmap.empty in
@@ -222,7 +242,11 @@ let type_function (env : env_t) (f : func) : unit =
       { env with vars = Idmap.merge merge_keep_first param_env env.vars }
       f.locals
   in
-  List.iter (type_stmt None new_env (source_typ_to_t f.ret)) f.body
+  List.iter (type_stmt None new_env (source_typ_to_t f.ret)) f.body;
+  if not (check_return_paths f.body) then
+    type_error f.loc "function might not return"
+  else
+    ()
 
 (* Get the declared types of all of the variables.  Raise an exception if a
    duplicate is found. Accumulate the answer in var_env. *)
