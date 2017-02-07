@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ type test_op =
 type test = atomic_exp * test_op * atomic_exp
 
 type next_block =
-  | End
+  | Return of var option
   | Next of int
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
@@ -72,6 +72,7 @@ type cfg_entry = { bnum : int; elems : block_elem list; next : next_block;
 
 type cfg = cfg_entry list
 
+val show_var : var -> string
 val pp_block_elem : Format.formatter -> block_elem -> unit
 val pp_test : Format.formatter -> test -> unit
 val build_cfg : SourceAst.stmt list -> cfg

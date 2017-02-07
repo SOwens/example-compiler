@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -70,7 +70,7 @@ let rec find_preds n cfg =
   List.partition
     (fun (entry, annots) ->
        match entry.next with
-       | End -> false
+       | Return _ -> false
        | Next n' ->
          n = n'
        | Branch (i, n1, n2) ->
@@ -184,7 +184,9 @@ let add_test_vars (ae1, op, ae2) vars =
 
 let add_exit_var (nb : next_block) (vars : Varset.t) : Varset.t =
   match nb with
-  | End | Next _ -> vars
+  | Return None -> vars
+  | Return (Some v) -> Varset.add v vars
+  | Next _ -> vars
   | Branch (t, _, _) -> add_test_vars t vars
 
 let remove_unused_writes (cfg : cfg) : cfg =

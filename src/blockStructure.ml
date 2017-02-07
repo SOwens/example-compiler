@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -156,11 +156,11 @@ let pp_test fmt (ae1, op, ae2) =
     pp_test_op op
     pp_atomic_exp ae2
 
-(* A basic block is either at the end of the program, or there is an
-   unconditional jump out of it, or a branch out of it. This type represents
-   the block number of the next block in the cfg. *)
+(* A basic block is either at the end of the function, returning a var, or
+   there is an unconditional jump out of it, or a branch out of it to the
+   blocks indexed by the int. *)
 type next_block =
-  | End
+  | Return of var option
   | Next of int
   (* The first int is the block number if the ident is true, and the second if
    * it is false *)
@@ -168,7 +168,8 @@ type next_block =
 
 let pp_next_block fmt nb =
   match nb with
-  | End -> Format.fprintf fmt "END"
+  | Return (Some v) -> Format.fprintf fmt "return %a" pp_var v
+  | Return None -> Format.fprintf fmt "return"
   | Next i -> Format.fprintf fmt "B%d" i
   | Branch (t,i1,i2) -> Format.fprintf fmt "if@ %a@ then@ B%d@ else@ B%d"
                           pp_test t
@@ -210,7 +211,7 @@ let cfg_to_graphviz fmt (cfg : cfg) : unit =
               entry;
             Format.fprintf fmt "@\n";
             match entry.next with
-            | End -> ()
+            | Return v -> ()
             | Next i ->
               Format.fprintf fmt "%d->%d@\n" entry.bnum i
             | Branch (t, i1, i2) ->
@@ -227,12 +228,13 @@ let id_to_var (i : S.id) : var =
 let bool_to_num b =
   if b then Num 1L else Num 0L
 
+(* Convert an amomic source expression *)
 let exp_to_atomic (e : S.exp) : atomic_exp =
   match e with
   | S.Ident (id, []) -> Ident (id_to_var id)
   | S.Num n -> Num n
   | S.Bool b -> bool_to_num b
-  | S.Ident (_, _::_) | S.Op _ | S.Uop _ | S.Array _ ->
+  | S.Ident (_, _::_) | S.Op _ | S.Uop _ | S.Array _ | S.Call _ ->
     raise (InternalError "non-flat expression in blockStructure")
 
 let tmp_var = NamedTmp("BS", 0)
@@ -272,6 +274,8 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
   | S.Array es ->
     [Call (Some v, "allocate" ^ string_of_int (List.length es),
            List.map exp_to_atomic es)]
+  | S.Call (f, es) ->
+    [Call (Some v, S.show_id f, List.map exp_to_atomic es)]
 
 let op_to_test_op op =
   match op with
@@ -297,6 +301,8 @@ let flat_exp_to_test (e : S.exp) : test =
     (exp_to_atomic ae, Eq, Num 0L)
   | S.Array es ->
     raise (InternalError "array alloc test in blockStructure")
+  | S.Call _ ->
+    raise (InternalError "function call test in blockStructure")
 
 (* Build the control-flow graph *)
 let build_cfg (stmts : S.stmt list) : cfg =
@@ -324,13 +330,15 @@ let build_cfg (stmts : S.stmt list) : cfg =
      - The expressions must all be unnested
        (i.e. UnnestExp.is_flat returns true).
      - && and || must have been removed.
-     - Multi-dimensional array indexing must have been removed. *)
+     - Multi-dimensional array indexing must have been removed.
+     - No statements can follow a return
+     - All paths must terminate in a return *)
   let rec find_blocks (block_num : int) (block_acc : basic_block)
-      (ret_block : next_block) (stmts : S.stmt list) : unit =
+      (following_block : next_block) (stmts : S.stmt list) : unit =
     match stmts with
-    | [] -> add_block block_num block_acc ret_block
+    | [] -> add_block block_num block_acc following_block
     | S.Assign (x, [], e) :: s1 ->
-      find_blocks block_num (flat_e_to_assign x e @ block_acc) ret_block s1
+      find_blocks block_num (flat_e_to_assign x e @ block_acc) following_block s1
     | S.Assign (x, [ae], e) :: s1 ->
       let ae = exp_to_atomic ae in
       (* x[ae] := e --> tmp_var := *x;
@@ -351,19 +359,19 @@ let build_cfg (stmts : S.stmt list) : cfg =
             BoundCheck (ae, Ident tmp_var);
             get_len])
       in
-      find_blocks block_num (new_block_elems @ block_acc) ret_block s1
+      find_blocks block_num (new_block_elems @ block_acc) following_block s1
     | S.Assign (x, _::_::_, e) :: s1 ->
       raise (InternalError "multi-dimension array index in blockStructure")
     | S.Stmts s1 :: s2 ->
       (* Treat { s1 ... sn } s1' ... sn' as though it were
          s1 ... sn s1' ... sn' *)
-      find_blocks block_num block_acc ret_block (s1 @ s2)
+      find_blocks block_num block_acc following_block (s1 @ s2)
     | S.DoWhile (s0, e, s1) :: s2 ->
       let header_block_n = get_block_num () in
       let body_block_n = get_block_num () in
       add_block block_num block_acc (Next header_block_n);
       find_blocks body_block_n [] (Next header_block_n) [s1];
-      (match (s2, ret_block) with
+      (match (s2, following_block) with
        | ([], Next i) ->
          find_blocks header_block_n []
            (Branch (flat_exp_to_test e, body_block_n, i))
@@ -373,33 +381,36 @@ let build_cfg (stmts : S.stmt list) : cfg =
          find_blocks header_block_n []
            (Branch (flat_exp_to_test e, body_block_n, following_block_n))
            [s0];
-         find_blocks following_block_n [] ret_block s2)
+         find_blocks following_block_n [] following_block s2)
     | S.Ite (e, s1, s2) :: s3 ->
       let true_block_n = get_block_num () in
       let false_block_n = get_block_num () in
       add_block block_num block_acc
         (Branch (flat_exp_to_test e, true_block_n, false_block_n));
       if s3 = [] then
-        (find_blocks true_block_n [] ret_block [s1];
-         find_blocks false_block_n [] ret_block [s2])
+        (find_blocks true_block_n [] following_block [s1];
+         find_blocks false_block_n [] following_block [s2])
       else
         let following_block_n = get_block_num () in
         find_blocks true_block_n [] (Next following_block_n) [s1];
         find_blocks false_block_n [] (Next following_block_n) [s2];
-        find_blocks following_block_n [] ret_block s3
+        find_blocks following_block_n [] following_block s3
     | S.In x :: s ->
       find_blocks block_num (Call (Some (id_to_var x),"input", []) :: block_acc)
-        ret_block s
+        following_block s
     | S.Out x :: s ->
       find_blocks block_num
-        (Call (None, "output", [Ident (id_to_var x)]) :: block_acc) ret_block s
+        (Call (None, "output", [Ident (id_to_var x)]) :: block_acc) following_block s
     | ((S.Loc (s1, _)) :: s2) ->
-      find_blocks block_num block_acc ret_block (s1::s2)
+      find_blocks block_num block_acc following_block (s1::s2)
+    | [S.Return x] ->
+      add_block block_num block_acc (Return (Some (id_to_var x)))
+    | S.Return _ :: _ ->
+      raise (InternalError "return followed by statements in blockStructure")
+
   in
 
-  let end_block_num = get_block_num () in
-  (* Later on we rely on the starting block being #1 *)
+  (* Later on we rely on the starting block being #0 *)
   let init_block = get_block_num () in
-  add_block end_block_num [] End;
-  find_blocks init_block [] (Next end_block_num) stmts;
+  find_blocks init_block [] (Return None) stmts;
   !the_cfg

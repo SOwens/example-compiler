@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -52,6 +52,7 @@ let rec might_have_effect (e : exp) : bool =
       might_have_effect e1 || might_have_effect e2
   | Uop (_, e) -> might_have_effect e
   | Array es -> List.exists might_have_effect es
+  | Call _ -> true (* The called function could do something *)
 
 (* Check whether two expressions are equal, and don't have effects. This lets
    some operators remove them. Note that we are just comparing the structure of
@@ -175,6 +176,8 @@ let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
      | _ -> Uop (uop, o))
   | Array es ->
     Array (List.map (fold_exp env) es)
+  | Call (f, es) ->
+    Call (f, List.map (fold_exp env) es)
 
 let is_const (e : exp) : bool =
   match e with
@@ -270,6 +273,9 @@ let rec prop_stmts (env : exp Idmap.t) (stmts : stmt list)
     let (env1, o1) = prop_stmt env s in
     let (env', stmts') = prop_stmts env1 stmts in
     (env', Loc (o1, ln) :: stmts')
+  | Return x :: stmts ->
+    (* We can't carry on past a return *)
+    (env, [Return x])
 
 and prop_stmt env (stmt : stmt) =
   match prop_stmts env [stmt] with

@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -130,7 +130,6 @@ let shrink_imm_elem (e : block_elem) : block_elem list =
             [e]
         end
     end
-
 
 let shrink_imm (cfg : cfg) : cfg =
   List.map

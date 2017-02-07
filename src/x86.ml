@@ -206,7 +206,8 @@ type instruction =
   | Zpop       of rm
   | Zpush      of imm_rm
   | Zcall      of string
-  | Zret       of int64
+  | Zret
+  | Zleave
   | Zcpuid
   | Zmov       of dest_src
   (* | Zmovzx     of dest_src *)
@@ -254,8 +255,10 @@ let pp_instruction fmt i =
       pp_imm_rm ir
   | Zcall lab ->
     fprintf fmt "call %s" lab
-  | Zret i ->
-    fprintf fmt "ret %Ld" i
+  | Zret ->
+    fprintf fmt "ret"
+  | Zleave ->
+    fprintf fmt "leave"
   | Zcpuid ->
     fprintf fmt "cpuid"
   | Zmov ds ->

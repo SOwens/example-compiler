@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -366,6 +366,8 @@ let to_x86 (ll : L.linear list) (num_stack : int)
        (fun l ->
           match l with
           | L.Instr be -> be_to_x86 be
+          | L.Return None -> [Zleave; Zret]
+          | L.Return (Some v) -> [Zmov (Zrm_r (var_to_rm v, RAX)); Zleave; Zret]
           | L.CJump ((ae1, op, ae2), b, s) ->
             test_to_x86 ae1 op ae2 b s
           | L.Jump s ->

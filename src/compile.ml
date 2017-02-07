@@ -54,13 +54,23 @@ let prog = FrontEnd.front_end filename false;;
 
 open SourceAst
 
-let functions = List.map CompileFunction.compile_fun prog.funcs
+(* Build a main function that just runs the initialisation of all of the
+   globals *)
+let main_function =
+  { fun_name = Source "main"; params = []; ret = Int;
+    locals = [];
+    body = List.map (fun d -> Assign (d.var_name, [], d.init)) prog.globals;
+    loc = None }
+
+let functions =
+  List.map CompileFunction.compile_fun (main_function::prog.funcs)
 
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
 (* Assembly wrapper *)
 fprintf fmt "[section .text align=16]@\n";;
 fprintf fmt "global main@\n@\n";;
+fprintf fmt "extern exit@\n";;
 fprintf fmt "extern input@\n";;
 fprintf fmt "extern output@\n";;
 fprintf fmt "extern allocate1@\n";;
@@ -73,18 +83,13 @@ fprintf fmt "extern allocate7@\n@\n";;
 List.iter
   (fun (name, code) -> fprintf fmt "%s:@\n%a" (show_id name) X86.pp_instr_list code)
   functions;;
-fprintf fmt "main:@\n";;
-(*fprintf fmt "%a" X86.pp_instr_list x86;;*)
-(* Prepare for exit system call *)
-fprintf fmt "@\nexit:@\n";;
-fprintf fmt "  mov rax, 0@\n";; (* Exit with 0, e.g. success *)
-fprintf fmt "  leave@\n";;
-fprintf fmt "  ret@\n@\n";;
-fprintf fmt "bound_error:@\n";;
-fprintf fmt "  mov rax, 1@\n";; (* Exit with 1, e.g. failure *)
-fprintf fmt "  leave@\n";;
-fprintf fmt "  ret@\n@\n";;
-(* OS X crashes if there isn't a data segment with something in it *)
-fprintf fmt "[section .data align=16]@\n";;
-fprintf fmt "dummy: db \" \", 0x0a";;
+fprintf fmt "bound_error:@\n%a"
+  (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 instr))
+  (BlockStructure.Call (None, "exit", [BlockStructure.Num 1L]));;
+fprintf fmt "null_error:@\n%a"
+  (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 instr))
+  (BlockStructure.Call (None, "exit", [BlockStructure.Num 2L]));;
+(* bss segment for the global variables, all initialised to 0 *)
+fprintf fmt "[section .bss align=16]@\n";;
+List.iter (fun d -> fprintf fmt "%s: dq@\n" (show_id d.var_name)) prog.globals;;
 close_out outfile;;

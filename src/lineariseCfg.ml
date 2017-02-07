@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -17,6 +17,9 @@
 *)
 
 (* Flatten the CFG into a list of three-address code. *)
+(* We generate labels of the form .block%d. The prefix . makes nasm treat them
+   as local to the function, so we don't have problems assembling files with
+   multiple functions and therefore duplicate block labels. *)
 
 open BlockStructure
 
@@ -25,6 +28,7 @@ type linear =
   | CJump of test * bool * string (* jump to string if the test is bool *)
   | Jump of string
   | Label of string
+  | Return of var option
 
 let pp_linear fmt l =
   match l with
@@ -39,6 +43,10 @@ let pp_linear fmt l =
     Format.fprintf fmt "  goto %s@\n" s
   | Label s ->
     Format.fprintf fmt "%s:@\n" s
+  | Return None ->
+    Format.fprintf fmt "  return@\n"
+  | Return (Some v) ->
+    Format.fprintf fmt "  return %s@\n" (show_var v)
 
 type linear_list = linear list
 
@@ -66,15 +74,14 @@ let rec cfg_to_linear (next_block : int) (cfg : cfg_entry I.t) : linear list =
     []
   else
     (b.finished <- true;
-     Label ("block" ^ string_of_int b.bnum) ::
+     Label (".block" ^ string_of_int b.bnum) ::
      List.map (fun x -> Instr x) b.elems @
      match b.next with
-     | End ->
-       [Jump "exit"]
+     | Return v -> [Return v]
      | Next i ->
        if (I.find i cfg).started then
          (* We've started the next block, so we'll just jump to it *)
-         [Jump ("block" ^ string_of_int i)]
+         [Jump (".block" ^ string_of_int i)]
        else
          (* We haven't started the next block, so we can put it here and omit
             the jump *)
@@ -87,20 +94,20 @@ let rec cfg_to_linear (next_block : int) (cfg : cfg_entry I.t) : linear list =
        | (false, false) ->
          c1.started <- true;
          c2.started <- true;
-         CJump (v, true, "block"  ^ string_of_int t1) ::
+         CJump (v, true, ".block"  ^ string_of_int t1) ::
          cfg_to_linear t2 cfg @
          cfg_to_linear t1 cfg
        | (true, true) ->
-         [CJump (v, true, "block"  ^ string_of_int t1);
-          Jump ("block" ^ string_of_int t2)]
+         [CJump (v, true, ".block"  ^ string_of_int t1);
+          Jump (".block" ^ string_of_int t2)]
        | (true, false) ->
          (c2.started <- true;
-          [CJump (v, true, "block"  ^ string_of_int t1)] @
+          [CJump (v, true, ".block"  ^ string_of_int t1)] @
           cfg_to_linear t2 cfg)
        | (false, true) ->
          (c1.started <- true;
-          [CJump (v, false, "block"  ^ string_of_int t2)] @
+          [CJump (v, false, ".block"  ^ string_of_int t2)] @
           cfg_to_linear t1 cfg))
 
 let cfg_to_linear cfg =
-  cfg_to_linear 1 (init_traversal cfg)
+  cfg_to_linear 0 (init_traversal cfg)

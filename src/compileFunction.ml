@@ -79,7 +79,7 @@ let compile_fun (f : func) : id * X86.instruction list =
   (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;*)
 
   let (reg_cfg, num_stack) =
-    RegAlloc.reg_alloc (* InstrSelX86.num_regs*) 0 (List.map fst lva_cfg4) in
+    RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst lva_cfg4) in
   (* printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg; *)
 
   let linear = LineariseCfg.cfg_to_linear reg_cfg in

@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -163,7 +163,10 @@ let count_vars_test (ae1, op, ae2) : unit M.t =
 
 let count_vars_nb (nb : next_block) : unit M.t =
   match nb with
-  | End -> M.return ()
+  | Return None -> M.return ()
+  | Return (Some v) ->
+    M.inc_var v >>= (fun _ ->
+    M.return ())
   | Next i -> M.return ()
   | Branch (r, t1, t2) ->
     count_vars_test r >>= (fun _ ->
@@ -202,13 +205,13 @@ let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
   | BoundCheck (a1, a2) ->
     BoundCheck (reg_alloc_ae map a1, reg_alloc_ae map a2)
 
-
 let reg_alloc_test (map : var Varmap.t) (ae1, op, ae2) : test =
   (reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)
 
 let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
   match nb with
-  | End -> End
+  | Return (Some v) -> Return (Some (Varmap.find v map))
+  | Return None -> Return None
   | Next i -> Next i
   | Branch (t, t1, t2) ->
     Branch (reg_alloc_test map t, t1, t2)

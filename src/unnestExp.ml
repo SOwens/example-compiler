@@ -1,6 +1,6 @@
 (*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@
    | Op of ae * op * ae
    | Uop of ae
    | Array of ae list
+   | Call of SourceAst.id * ae list
  *)
 
 open Util
@@ -46,6 +47,7 @@ let is_atomic (e : exp) : bool =
   | Op _ -> false
   | Uop _ -> false
   | Array _ -> false
+  | Call _ -> false
 
 let is_flat (e : exp) : bool =
   match e with
@@ -57,6 +59,7 @@ let is_flat (e : exp) : bool =
   | Op (e1, op, e2) -> is_atomic e1 && is_atomic e2
   | Uop (uop, e) -> is_atomic e
   | Array es -> List.for_all is_atomic es
+  | Call (_, es) -> List.for_all is_atomic es
 
 let rec unnest (stmts : stmt list) : stmt list =
 
@@ -129,6 +132,10 @@ let rec unnest (stmts : stmt list) : stmt list =
     | Array es ->
       let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
       (List.flatten s_list, Array aes)
+    | Call (f, es) ->
+      let (s_list, aes) = List.split (List.map unnest_exp_atomic es) in
+      (List.flatten s_list, Call  (f, aes))
+
 
 (* Similar to unnest_exp, but ensures that the returned exp is atomic, rather
    than just flat.  *)
@@ -179,6 +186,7 @@ let rec unnest (stmts : stmt list) : stmt list =
     | Out id -> [Out id]
     | Loc (stmt, int) ->
       unnest_stmt stmt
+    | Return id -> [Return id]
   in
 
   List.flatten (List.map unnest_stmt stmts)
