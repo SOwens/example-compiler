@@ -1,5 +1,7 @@
 // Input a number and print its factorial
 
+let v : int = exec(0)
+
 function iter_fact (x : int) : int {
   let c : int = 1
   let z : int = 1
@@ -20,8 +22,7 @@ function rec_fact (x : int) : int {
   }
 }
 
-function exec : int {
-  let x : int = 0
+function exec (x : int) : int {
   let y : int = 0
   let r : int = 0
   input x

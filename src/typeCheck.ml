@@ -17,6 +17,7 @@
 *)
 
 (* The type checker *)
+(* TODO check that each function must return *)
 
 open Util
 open SourceAst
