@@ -120,7 +120,7 @@ type env_t = { funs : func Idmap.t; vars : val_t ref Idmap.t }
 (* To model return control flow *)
 exception Return_exn of val_t
 
-(* Add the function's arguments to the environment env at a call sight. Assume
+(* Add the function's arguments to the environment env at a call site. Assume
    that the two input lists are the same length. This is ensured by the type
    checker. We also know there are no duplicate parameter names. *)
 let rec add_arguments (params : (id * _) list) (args : val_t list) (env : env_t)
@@ -139,7 +139,8 @@ let rec add_arguments (params : (id * _) list) (args : val_t list) (env : env_t)
 let rec interp_exp (env : env_t) (e : exp) : val_t =
   match e with
   | Ident (i, []) ->
-    !(Idmap.find i env.vars) (* i will be in the environment in a well-typed program *)
+    !(Idmap.find i env.vars) (* i will be in the environment in a well-typed
+                                program *)
   | Ident (i, iexps) ->
     let (sizes, a) = val_t_to_array !(Idmap.find i env.vars) in
     let indices =
@@ -199,13 +200,26 @@ let rec interp_exp (env : env_t) (e : exp) : val_t =
 (* Run the initialisation expressions of the variables, and add bindings to the
    resulting values into the environment *)
 and interp_var_decs (env : env_t) (decs : var_dec list) : env_t =
-  match decs with
-  | [] -> env
-  | d::decs ->
-    let v = interp_exp env d.init in
-    let binding = ref v in
-    let new_var_env = Idmap.add d.var_name binding env.vars in
-    interp_var_decs { env with vars = new_var_env } decs
+  (* Start the variables at 0, because they can be referenced before they are
+     initialised. NB, this allows null pointer exceptions (or crashes) into the
+     language, since the variable can have array type.  This is a consequence
+     of having each global and local scope be a single recursive scope. *)
+  let new_env =
+    List.fold_right
+      (fun v env ->
+        let binding = ref (Vint 0L) in
+         Idmap.add v.var_name binding env)
+      decs
+      env.vars
+  in
+  let env = { env with vars = new_env } in
+  (* Now run all of the initialisation expressions *)
+  List.iter
+    (fun d ->
+       let v = interp_exp env d.init in
+       Idmap.find d.var_name env.vars := v)
+    decs;
+  env
 
 (* Run a statement *)
 and interp_stmt (env : env_t) (s : stmt) : unit =
@@ -259,24 +273,4 @@ let interp_prog (p : prog) : unit =
     List.fold_right (fun f env -> Idmap.add f.fun_name f env)
       p.funcs Idmap.empty
   in
-  let global_env =
-    List.fold_right
-      (fun v env ->
-         (* Start the global variables at 0, because they can be referenced
-            before they are initialised. NB, this allows null pointer
-            exceptions (or crashes) into the language, since the global
-            variable can have array type. This is a consequence of having the
-            top-level be a single recursive scope. *)
-         let binding = ref (Vint 0L) in
-         Idmap.add v.var_name binding env)
-      p.globals
-      Idmap.empty
-  in
-  let env = { funs = fun_env; vars = global_env } in
-  (* Now run all of the global initialisation *)
-  List.iter
-    (fun d ->
-       let v = interp_exp env d.init in
-       Idmap.find d.var_name env.vars := v)
-    p.globals
-
+  ignore (interp_var_decs { funs = fun_env; vars = Idmap.empty } p.globals)
