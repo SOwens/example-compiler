@@ -41,3 +41,16 @@ void output(int64_t i) {
   printf("%" PRId64 "\n", i);
   return;
 }
+
+// signal an error
+void signal_error(int64_t errno) {
+  switch errno {
+    case 0:
+      printf("array bounds error\n");
+      break;
+    case 1:
+      printf("null pointer dereference\n");
+      break;
+  }
+  exit(1);
+}

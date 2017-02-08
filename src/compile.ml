@@ -50,7 +50,7 @@ let filename =
   | Some filename ->
     filename
 
-let prog = FrontEnd.front_end filename true;;
+let prog = FrontEnd.front_end filename false;;
 
 open SourceAst
 
@@ -85,10 +85,10 @@ List.iter
   functions;;
 fprintf fmt "bound_error:@\n%a"
   (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 instr))
-  (BlockStructure.Call (None, "exit", [BlockStructure.Num 1L]));;
+  (BlockStructure.Call (None, "signal_error", [BlockStructure.Num 0L]));;
 fprintf fmt "null_error:@\n%a"
   (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 instr))
-  (BlockStructure.Call (None, "exit", [BlockStructure.Num 2L]));;
+  (BlockStructure.Call (None, "signal_error", [BlockStructure.Num 1L]));;
 (* bss segment for the global variables, all initialised to 0 *)
 fprintf fmt "[section .bss align=16]@\n";;
 List.iter (fun d -> fprintf fmt "%s: dq@\n" (show_id d.var_name)) prog.globals;;

@@ -9,12 +9,17 @@ blockInterp.cmi : blockStructure.cmi
 blockStructure.cmo : util.cmo tokens.cmi sourceAst.cmi blockStructure.cmi
 blockStructure.cmx : util.cmx tokens.cmx sourceAst.cmx blockStructure.cmi
 blockStructure.cmi : tokens.cmi sourceAst.cmi
-compile.cmo : x86.cmo util.cmo unnestExp.cmi sourceAst.cmi \
+compile.cmo : x86.cmo util.cmo sourceAst.cmi instrSelX86.cmi frontEnd.cmi \
+    compileFunction.cmi blockStructure.cmi
+compile.cmx : x86.cmx util.cmx sourceAst.cmx instrSelX86.cmx frontEnd.cmx \
+    compileFunction.cmx blockStructure.cmx
+compileFunction.cmo : x86.cmo unnestExp.cmi sourceAst.cmi \
     shrinkImmediates.cmi regAlloc.cmi liveVarAnalysis.cmi lineariseCfg.cmi \
-    instrSelX86.cmi frontEnd.cmi constProp.cmi blockStructure.cmi
-compile.cmx : x86.cmx util.cmx unnestExp.cmx sourceAst.cmx \
+    instrSelX86.cmi constProp.cmi blockStructure.cmi compileFunction.cmi
+compileFunction.cmx : x86.cmx unnestExp.cmx sourceAst.cmx \
     shrinkImmediates.cmx regAlloc.cmx liveVarAnalysis.cmx lineariseCfg.cmx \
-    instrSelX86.cmx frontEnd.cmx constProp.cmx blockStructure.cmx
+    instrSelX86.cmx constProp.cmx blockStructure.cmx compileFunction.cmi
+compileFunction.cmi : x86.cmo sourceAst.cmi
 constProp.cmo : util.cmo tokens.cmi sourceAst.cmi constProp.cmi
 constProp.cmx : util.cmx tokens.cmx sourceAst.cmx constProp.cmi
 constProp.cmi : sourceAst.cmi
@@ -25,9 +30,9 @@ instrSelX86.cmo : x86.cmo util.cmo tokens.cmi lineariseCfg.cmi \
     blockStructure.cmi instrSelX86.cmi
 instrSelX86.cmx : x86.cmx util.cmx tokens.cmx lineariseCfg.cmx \
     blockStructure.cmx instrSelX86.cmi
-instrSelX86.cmi : x86.cmo lineariseCfg.cmi
-interp.cmo : sourceAst.cmi frontEnd.cmi astInterp.cmi
-interp.cmx : sourceAst.cmx frontEnd.cmx astInterp.cmx
+instrSelX86.cmi : x86.cmo lineariseCfg.cmi blockStructure.cmi
+interp.cmo : frontEnd.cmi astInterp.cmi
+interp.cmx : frontEnd.cmx astInterp.cmx
 lineariseCfg.cmo : util.cmo blockStructure.cmi lineariseCfg.cmi
 lineariseCfg.cmx : util.cmx blockStructure.cmx lineariseCfg.cmi
 lineariseCfg.cmi : util.cmo blockStructure.cmi
@@ -36,8 +41,6 @@ liveVarAnalysis.cmo : util.cmo tokens.cmi blockStructure.cmi \
 liveVarAnalysis.cmx : util.cmx tokens.cmx blockStructure.cmx \
     liveVarAnalysis.cmi
 liveVarAnalysis.cmi : util.cmo blockStructure.cmi
-pretty.cmo : util.cmo tokens.cmi sourceAst.cmi
-pretty.cmx : util.cmx tokens.cmx sourceAst.cmx
 regAlloc.cmo : util.cmo blockStructure.cmi regAlloc.cmi
 regAlloc.cmx : util.cmx blockStructure.cmx regAlloc.cmi
 regAlloc.cmi : blockStructure.cmi

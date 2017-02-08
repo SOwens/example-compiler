@@ -44,6 +44,7 @@ Back end
 - _x86.ml_: An AST for the small subset of x86-64 that the compiler generates.
   Includes a printer for it in NASM syntax.
 - _instrSelX86.ml_: Generate x86 code.
+- _compileFunction.ml_: packages up the compiler for single functions
 
 Misc
 ----

@@ -17,7 +17,11 @@
 *)
 
 (* The type checker. In addition to checking the types, we build a new AST that
-   annotates the scope of all of the variables. *)
+   annotates the scope of all of the variables. Each use of a variable either
+   refers to a global variable, a local variable, or a function parameter. The
+   type checker keeps track of which sort each variable is and annotates each
+   use with this information. This allows the register allocator and back end
+   to treat them differently. *)
 
 open Util
 open SourceAst
@@ -35,7 +39,7 @@ let show_t t =
   | Tbool -> "bool"
   | Tarray n -> "array " ^ string_of_int n
 
-(* Map functions and identifiers to their types, and scope *)
+(* Map functions to their types, and variables to their types and scope *)
 type env_t = { funs : (t list * t) Idmap.t; vars : (t * scope) Idmap.t }
 
 (* Raise a type error *)
@@ -46,6 +50,7 @@ let type_error (ln : int option) (msg : string) : 'a =
   | None ->
     raise (BadInput ("Type error at unknown location: " ^ msg))
 
+(* Annotate an identifier with its scope *)
 let add_scope (id : id) (s : scope) : id =
   match id with
   | Source (i, None) -> Source (i, Some s)
@@ -55,7 +60,7 @@ let add_scope (id : id) (s : scope) : id =
 
 (* Compute the type of an expression, or raise BadInput if there is a type
    error. Also return a new scope-annotated version of the expression. *)
-let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp=
+let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
   match e with
   | Ident (i, es) ->
     let (t, scope) =
@@ -144,6 +149,12 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp=
     else
       type_error ln "Array dimension with non-integer type"
 
+(* Type check an identifier without array indices *)
+let type_simple_ident (ln : int option) (env : env_t) (i : id) : t * id =
+  match type_exp ln env (Ident (i, [])) with
+  | (t, Ident (i', [])) -> (t, i')
+  | _ -> assert false (* type_exp does not change the shape of the expression *)
+
 (* Type check a statement. Raise BadInput if there is an error. return gives
    the return type of the enclosing function. ln gives the current line number.
    Return a scope annotated version of the statement. Also strip the location
@@ -153,30 +164,24 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt)
   : stmt =
   match stmt with
   | In i ->
-    (match type_exp ln env (Ident(i, [])) with
-     | (t, Ident (i', [])) ->
-       if t <> Tint then
-         type_error ln "Input with non-integer type"
-       else
-         In i'
-     | _ -> assert false)
+    let (t, i') = type_simple_ident ln env i in
+    if t <> Tint then
+      type_error ln "Input with non-integer type"
+    else
+      In i'
   | Out i ->
-    (match type_exp ln env (Ident(i, [])) with
-     | (t, Ident (i', [])) ->
-       if t <> Tint then
-         type_error ln "Output with non-integer type"
-       else
-         Out i'
-     | _ -> assert false)
+    let (t, i') = type_simple_ident ln env i in
+    if t <> Tint then
+      type_error ln "Input with non-integer type"
+    else
+      Out i'
   | Return i ->
-    (match type_exp ln env (Ident(i, [])) with
-     | (t, Ident (i', [])) ->
-       if t <> return then
-         type_error ln ("return has type " ^ show_t t ^ " in a function with
+    let (t, i') = type_simple_ident ln env i in
+    if t <> return then
+      type_error ln ("return has type " ^ show_t t ^ " in a function with
                      return type " ^ show_t return)
-       else
-         Return i'
-     | _ -> assert false)
+    else
+      Return i'
   | Assign (x, es, e) ->
     (match type_exp ln env (Ident (x, es)) with
      | (t1, Ident (x', es')) ->
@@ -217,32 +222,41 @@ let source_typ_to_t (t : SourceAst.typ) : t =
    duplicate name is found, using the location ln. Accumulate the answer in
    param_env. *)
 let rec get_param_types (ln : int option) (params : (id * typ) list)
-    (param_env : (t*scope) Idmap.t)
-  : (t*scope) Idmap.t =
+    (param_env : (t * scope) Idmap.t)
+  : (t * scope) Idmap.t =
   match params with
   | [] -> param_env
   | (x,t)::params ->
     if Idmap.mem x param_env then
       type_error ln ("Duplicate function parameter " ^ show_id x)
     else
-      get_param_types ln params (Idmap.add x (source_typ_to_t t, Parameter) param_env)
+      get_param_types ln params
+        (Idmap.add x (source_typ_to_t t, Parameter) param_env)
 
-(* Check a list of variable declarations, and add their types to env with the
-   given scope s. Also return a scope-annotated version of the declaration.
-   This just applies to the initialisation expressions. *)
-let rec type_var_dec_list (s : scope) (env : env_t) (decs : var_dec list)
-  : env_t * var_dec list =
-  match decs with
-  | [] -> (env, [])
-  | v::decs ->
-    let (t, init') = type_exp v.loc env v.init in
-    if t = source_typ_to_t v.typ then
-      let new_env = { env with vars = Idmap.add v.var_name (t,s) env.vars } in
-      let (env', decs') = type_var_dec_list s new_env decs in
-      (env', { v with var_name = add_scope v.var_name s; init = init' } :: decs')
+(* Get the declared types of all of the variables.  Raise an exception if a
+   duplicate is found. Accumulate the answer in var_env. *)
+let rec get_var_types (s : scope) (vars : var_dec list)
+    (var_env : (t * scope) Idmap.t)
+  : (t * scope) Idmap.t =
+  match vars with
+  | [] -> var_env
+  | v::vars ->
+    if Idmap.mem v.var_name var_env then
+      type_error v.loc ("Duplicate variable definition " ^ show_id v.var_name)
     else
-      type_error (v.loc) ("variable initialisation with type " ^ show_t t)
+      get_var_types s vars
+        (Idmap.add v.var_name (source_typ_to_t v.typ, s) var_env)
 
+(* Check the init expressions on a variable declaration. Return a
+   scope-annotated version of the declaration. *)
+let rec type_var_dec (s : scope) (env : env_t) (dec : var_dec) : var_dec =
+  let (t, init') = type_exp dec.loc env dec.init in
+  if t = source_typ_to_t dec.typ then
+    { dec with var_name = add_scope dec.var_name s; init = init' }
+  else
+    type_error dec.loc ("variable initialisation with type " ^ show_t t)
+
+(* See the documentation for Map.merge in the OCaml standard library *)
 let merge_keep_first _ (x : 'a option) (y : 'a option) : 'a option =
   match (x,y) with
   | (None, None) -> None
@@ -251,7 +265,7 @@ let merge_keep_first _ (x : 'a option) (y : 'a option) : 'a option =
   | (None, Some y) -> Some y
 
 (* Determine whether that each control-flow path through the stmts must include
-   a return.  This was we know that a function cannot fall off the end, without
+   a return.  This way we know that a function cannot fall off the end, without
    returning a value of the correct type. *)
 let rec check_return_paths (stmts : stmt list) : bool =
   match stmts with
@@ -260,9 +274,9 @@ let rec check_return_paths (stmts : stmt list) : bool =
   | s::stmts ->
     if check_return_paths stmts then
       true
-    else (* The remainder might not return, so we must, but we arent'a return *)
+    else (* The remainder might not return, so the first statement must *)
       match s with
-      | Return _ -> assert false
+      | Return _ -> assert false (* already checked for this case *)
       | In _ | Out _ | Assign _ -> false
       | Loc (s,_) -> check_return_paths [s]
       | Ite (e,s1,s2) ->
@@ -274,32 +288,23 @@ let rec check_return_paths (stmts : stmt list) : bool =
 (* Check a function. Return a scope-annotated version is there are no errors. *)
 let type_function (env : env_t) (f : func) : func =
   let param_env = get_param_types f.loc f.params Idmap.empty in
-  let (new_env, locals') =
-    type_var_dec_list
-      Local
-      (* The local variables' initialisers can refer to the parameters *)
-      { env with vars = Idmap.merge merge_keep_first param_env env.vars }
-      f.locals
+  let local_env = get_var_types Local f.locals Idmap.empty in
+  (* Add the parameter and locals to the env. Ensure that the locals shadow the
+     parameters and globals, and that the parameters shadow the globals. *)
+  let env1 = Idmap.merge merge_keep_first param_env env.vars in
+  let env2 = Idmap.merge merge_keep_first local_env env1 in
+  let new_env = { env with vars = env2 } in
+  let locals' = List.map (type_var_dec Local new_env) f.locals in
+  let body' =
+    List.map (type_stmt None new_env (source_typ_to_t f.ret)) f.body
   in
-  let body' = List.map (type_stmt None new_env (source_typ_to_t f.ret)) f.body in
   if not (check_return_paths f.body) then
     type_error f.loc "function might not return"
   else
-    { f with params = List.map (fun (i,t) -> (add_scope i Parameter, t)) f.params;
-             locals = locals'; body = body' }
-
-(* Get the declared types of all of the variables.  Raise an exception if a
-   duplicate is found. Accumulate the answer in var_env. *)
-let rec get_var_types (s : scope) (vars : var_dec list) (var_env : (t*scope) Idmap.t)
-  : (t*scope) Idmap.t =
-  match vars with
-  | [] -> var_env
-  | v::vars ->
-    if Idmap.mem v.var_name var_env then
-      type_error v.loc ("Duplicate variable definition " ^ show_id v.var_name)
-    else
-      get_var_types s vars
-        (Idmap.add v.var_name (source_typ_to_t v.typ, s) var_env)
+    { f with
+      params = List.map (fun (i,t) -> (add_scope i Parameter, t)) f.params;
+      locals = locals';
+      body = body' }
 
 (* Get the declared types of all of the functions. Raise an exception if a
    duplicate is found. Accumulate the answer in fun_env. *)
@@ -327,7 +332,7 @@ let type_prog (p : prog) : prog =
      with types for all of the globals and functions. This means that the
      top-level is one recursive scope and each function body and global
      initialisation can refer to any of the others (or itself). *)
-  let (_, globals') = type_var_dec_list Global env p.globals in
+  let globals' = List.map (type_var_dec Global env) p.globals in
   let funcs' = List.map (type_function env) p.funcs in
   { funcs = funcs'; globals = globals' }
 
