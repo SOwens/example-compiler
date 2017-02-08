@@ -1,5 +1,13 @@
+//test division
+
+let x : int = test(0)
+
+function test(x : int) : int
 {
+  let x : int = 0
+  let y : int = 0
   input x
   y := 10 / x
   output y
+  return y
 }

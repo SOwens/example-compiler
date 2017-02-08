@@ -45,7 +45,7 @@ type env_t = { funs : (t list * t) Idmap.t; vars : (t * scope) Idmap.t }
 (* Raise a type error *)
 let type_error (ln : int option) (msg : string) : 'a =
   match ln with
-  Some ln ->
+  | Some ln ->
     raise (BadInput ("Type error on line " ^ string_of_int ln ^ ": " ^ msg))
   | None ->
     raise (BadInput ("Type error at unknown location: " ^ msg))
@@ -98,7 +98,7 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
     (* A local function to check that the parameter and argument types match
        up. Use n to keep track of which position, for the error message. Assume
        that the lists are of the same length. *)
-    let rec check (n :int) (pts : t list) (ats : t list) : unit =
+    let rec check (n : int) (pts : t list) (ats : t list) : unit =
       match (pts, ats) with
       | ([], []) -> ()
       | (pt::pts, at::ats) ->
@@ -335,4 +335,3 @@ let type_prog (p : prog) : prog =
   let globals' = List.map (type_var_dec Global env) p.globals in
   let funcs' = List.map (type_function env) p.funcs in
   { funcs = funcs'; globals = globals' }
-

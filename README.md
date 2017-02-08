@@ -72,12 +72,12 @@ indices ::=
 | epsilon
 
 args ::=  
-| `(` exp `)`  
-| `(` exp `)` args
+| exp  
+| exp `,` args
 
 atomic_exp ::=  
 | identifier indices --- Variable use and array indexing  
-| identifier args    --- Function call  
+| identifier `(` args `)` --- Function call  
 | number             --- Integer constant  
 | `true`             --- Boolean constant  
 | `false`            --- Boolean constant  

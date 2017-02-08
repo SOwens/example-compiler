@@ -67,9 +67,6 @@ let array_address (sizes : int list) (indices : int list) : int option =
   else
     None
 
-(* The store will map variable names to values *)
-type store_t = val_t Idmap.t
-
 let bool_to_int64 (b : bool) : int64 =
   if b then 1L else 0L
 
