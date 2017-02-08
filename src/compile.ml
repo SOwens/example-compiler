@@ -59,12 +59,13 @@ open SourceAst
 let main_function =
   { fun_name = Source ("main", None); params = []; ret = Int;
     locals = [];
-    body = List.map (fun d -> Assign (d.var_name, [], d.init)) prog.globals;
+    body = List.map (fun d -> Assign (d.var_name, [], d.init)) prog.globals @
+           [Return None];
     loc = None }
 
 let global_id_to_var (g : SourceAst.id) : BlockStructure.var =
   match g with
-  | Source (i, Some Global) -> BlockStructure.Global i
+  | Source (i, Some Global) -> BlockStructure.NamedSource (i, Global)
   | _ -> assert false
 
 let globals =

@@ -53,7 +53,7 @@ type stmt =
   | Stmts of stmt list
   | In of id
   | Out of id
-  | Return of id
+  | Return of id option
   | Loc of stmt * int (* annotate a statement with it's source line number *)
 
 type typ =

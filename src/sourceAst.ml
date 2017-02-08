@@ -164,7 +164,7 @@ type stmt =
   | Stmts of stmt list
   | In of id
   | Out of id
-  | Return of id
+  | Return of id option
   | Loc of stmt * int (* annotate a statement with it's source line number *)
 
 let rec pp_stmt fmt stmt =
@@ -205,7 +205,9 @@ let rec pp_stmt fmt stmt =
   | Out i ->
     Format.fprintf fmt "@[<2>output@ %a@]"
       pp_id i
-  | Return i ->
+  | Return None ->
+    Format.fprintf fmt "return"
+  | Return (Some i) ->
     Format.fprintf fmt "@[<2>return@ %a@]"
       pp_id i
   | Loc (s, _) ->
@@ -384,7 +386,7 @@ let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
     (Loc (Stmts (s_list), ln), toks)
   | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In (Source (x,None)), ln), toks)
   | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out (Source (x,None)), ln), toks)
-  | (T.Return, ln) :: (T.Ident x, _) :: toks -> (Loc (Return (Source (x,None)), ln), toks)
+  | (T.Return, ln) :: (T.Ident x, _) :: toks -> (Loc (Return (Some (Source (x,None))), ln), toks)
   | (_,ln) :: _ ->
     parse_error ln "Bad statement"
 

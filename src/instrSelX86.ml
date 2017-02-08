@@ -221,6 +221,7 @@ let setup_arg (overwritten_regs : reg list) (dest_r : reg) (ae : atomic_exp)
                    Zm (None, Some RSP, Some (Concrete_disp (stack_reg_to_offset src_r)))))
     else
       Some (Zr_rm (dest_r, Zr src_r))
+  | Ident (Global i) -> Some (Zr_rm (dest_r, var_to_rm (Global i)))
   | Ident ((NamedSource _ | NamedTmp _) as v) ->
     raise (Util.InternalError ("Named variable in instrSelX86: " ^ show_var v))
 

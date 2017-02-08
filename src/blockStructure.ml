@@ -58,11 +58,11 @@ let compare_var v1 v2 =
 
 let show_var v =
   match v with
-  | Vreg i -> "r" ^ string_of_int i
-  | Stack i -> "s" ^ string_of_int i
-  | Global i -> "g_" ^ i
+  | Vreg i -> "_r_" ^ string_of_int i
+  | Stack i -> "_s_" ^ string_of_int i
+  | Global i -> "_g_" ^ i
   | NamedSource (s,_) -> s
-  | NamedTmp (s, i) -> "_" ^ s ^ string_of_int i
+  | NamedTmp (s, i) -> "_tmp_" ^ s ^ string_of_int i
 
 let pp_var fmt v =
   Format.fprintf fmt "%s" (show_var v)
@@ -422,8 +422,10 @@ let build_cfg (stmts : S.stmt list) : cfg =
         (Call (None, "output", [Ident (id_to_var x)]) :: block_acc) following_block s
     | ((S.Loc (s1, _)) :: s2) ->
       find_blocks block_num block_acc following_block (s1::s2)
-    | [S.Return x] ->
+    | [S.Return (Some x)] ->
       add_block block_num block_acc (Return (Some (id_to_var x)))
+    | [S.Return None] ->
+      add_block block_num block_acc (Return None)
     | S.Return _ :: _ ->
       raise (InternalError "return followed by statements in blockStructure")
 

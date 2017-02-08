@@ -175,13 +175,15 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt)
       type_error ln "Input with non-integer type"
     else
       Out i'
-  | Return i ->
+  | Return (Some i) ->
     let (t, i') = type_simple_ident ln env i in
     if t <> return then
       type_error ln ("return has type " ^ show_t t ^ " in a function with
                      return type " ^ show_t return)
     else
-      Return i'
+      Return (Some i')
+  | Return None ->
+    type_error ln "Return without value"
   | Assign (x, es, e) ->
     (match type_exp ln env (Ident (x, es)) with
      | (t1, Ident (x', es')) ->

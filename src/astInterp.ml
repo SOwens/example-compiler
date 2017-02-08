@@ -261,7 +261,9 @@ and interp_stmt (env : env_t) (s : stmt) : unit =
   | Out i ->
     (print_string (Int64.to_string (val_t_to_int !(Idmap.find i env.vars)));
      print_newline ())
-  | Return i ->
+  | Return None ->
+    raise (Return_exn (Vint 0L))
+  | Return (Some i) ->
     raise (Return_exn !(Idmap.find i env.vars))
   | Loc (s, _) -> interp_stmt env s
 
