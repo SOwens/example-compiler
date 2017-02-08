@@ -1,0 +1,56 @@
+// Test/demonstrate variable scoping
+
+// should print 1, 11, 12, 8, 5, 9, 10, then 100 plus those, then
+// 101, 11, 12, 16, 13, 9, 10, then 100 plus those, then finally
+// 201, 2, 3, 4
+
+let g : int = 1
+let x : int = 2
+let y : int = 3
+let z : int = 4
+
+let r : int = test1(5, 6, 7, 8)
+let r2 : int = test1(13, 14, 15, 16)
+let r3 : int = test2(1)
+
+
+function test1 (a : int) (b : int) (y : int) (z : int) : int {
+  let b : int = 9
+  let c : int = 10
+  let x : int = 11
+  let y : int = 12
+
+  output g
+  output x
+  output y
+  output z
+  output a
+  output b
+  output c
+
+  g := g + 100
+  x := x + 100
+  y := y + 100
+  z := z + 100
+  a := a + 100
+  b := b + 100
+  c := c + 100
+
+  output g
+  output x
+  output y
+  output z
+  output a
+  output b
+  output c
+
+  return x
+}
+
+function test2 (aa : int) : int {
+  output g
+  output x
+  output y
+  output z
+  return aa
+}
