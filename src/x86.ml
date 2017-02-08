@@ -78,11 +78,15 @@ type address_component =
   | EAReg of reg
   | EAConst of int64
 
+type displacement =
+  | Concrete_disp of int64
+  | Label_disp of string
+
 type rm =
   | Zr of reg                                          (* register *)
   (* Zm (Some (scale, index), Some base, Some displacement) =
      mem[scale * index + base + displacement] *)
-  | Zm of (int * reg) option * reg option * int64 option
+  | Zm of (int * reg) option * reg option * displacement option
 
 let rec simple_add_exp fmt l =
   match l with
@@ -92,6 +96,11 @@ let rec simple_add_exp fmt l =
   | Some x :: y -> fprintf fmt "%s + %a" x simple_add_exp y
   | None :: y -> simple_add_exp fmt y
 
+let show_displacement d =
+  match d with
+  | Concrete_disp i -> Int64.to_string i
+  | Label_disp l -> l ^ "_Global"
+
 let pp_rm fmt rm =
   match rm with
   | Zr r -> fprintf fmt "%a" pp_reg r
@@ -99,7 +108,7 @@ let pp_rm fmt rm =
     fprintf fmt "qword [%a]"
       simple_add_exp [option_map (fun (scale,i) -> show_reg i ^ " * " ^ string_of_int scale) idx;
                       option_map show_reg base;
-                      option_map Int64.to_string disp]
+                      option_map show_displacement disp]
 
 type dest_src =
   | Zrm_i of rm  * int64  (* mnemonic r/mXX, immXX (sign-extended) *)

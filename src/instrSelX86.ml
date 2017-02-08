@@ -68,8 +68,8 @@ let r_scratch2 = R10
 let var_to_rm (v : var) : rm =
   match v with
   | Vreg i -> Zr (List.assoc i reg_numbers)
-  | Stack i -> Zm (None, Some RBP, Some (Int64.of_int (-8 * (i+1))))
-  | Global g -> raise (TODO "global variables")
+  | Stack i -> Zm (None, Some RBP, Some (Concrete_disp (Int64.of_int (-8 * (i+1)))))
+  | Global g -> Zm (None, None, Some (Label_disp g))
   | n -> raise (Util.InternalError ("named variable in instrSelX86: " ^ show_var n))
 
 let rm_rm_to_dest_src (dest_rm : rm) (src_rm : rm)
@@ -91,7 +91,7 @@ let rm_ae_to_dest_src (dest_rm : rm) (src_ae : atomic_exp)
 let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
   match (base, offset) with
   | (Vreg b, Num o) ->
-    ([], Zm (None, Some (List.assoc b reg_numbers), Some o))
+    ([], Zm (None, Some (List.assoc b reg_numbers), Some (Concrete_disp o)))
   | (Vreg b, Ident (Vreg o)) ->
     ([],
      Zm (Some (1, List.assoc o reg_numbers),
@@ -104,7 +104,7 @@ let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
          None))
   | (Stack i, Num o) ->
     ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
-     Zm (None, Some r_scratch2, Some o))
+     Zm (None, Some r_scratch2, Some (Concrete_disp o)))
   | (Stack i, Ident (Vreg r)) ->
     ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
      Zm (Some (1, List.assoc r reg_numbers),
@@ -218,7 +218,7 @@ let setup_arg (overwritten_regs : reg list) (dest_r : reg) (ae : atomic_exp)
       None
     else if List.mem src_r overwritten_regs then
       Some (Zr_rm (dest_r,
-                   Zm (None, Some RSP, Some (stack_reg_to_offset src_r))))
+                   Zm (None, Some RSP, Some (Concrete_disp (stack_reg_to_offset src_r)))))
     else
       Some (Zr_rm (dest_r, Zr src_r))
   | Ident ((NamedSource _ | NamedTmp _) as v) ->
