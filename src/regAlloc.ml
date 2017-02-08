@@ -16,172 +16,98 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
+(* A very simple register allocator. Global variables never get put in a
+   register. Function parameters stay in the registers that they are passed in.
+   Local variables get put in the remaining registers in no particular order.
+   The rest are put on the stack *)
+
 open Util
 open BlockStructure
 
-(* Copy and paste from extlib to get input_file without making a dependency.
-   extlib is LGPL 2.1, and so this sub-module is too.
-   https://github.com/ygrek/ocaml-extlib/blob/33f744ddb28d6a0f4c96832145e1a6e384644709/src/extList.ml
-*)
-
-exception Invalid_index of int
-
-type 'a mut_list =  {
-  hd: 'a;
-  mutable tl: 'a list
-}
-external inj : 'a mut_list -> 'a list = "%identity"
-let split_nth index = function
-  | [] -> if index = 0 then [],[] else raise (Invalid_index index)
-  | (h :: t as l) ->
-    if index = 0 then [],l
-    else if index < 0 then raise (Invalid_index index)
-    else
-      let rec loop n dst l =
-        if n = 0 then l else
-        match l with
-        | [] -> raise (Invalid_index index)
-        | h :: t ->
-          let r = { hd =  h; tl = [] } in
-          dst.tl <- inj r;
-          loop (n-1) r t
-      in
-      let r = { hd = h; tl = [] } in
-      inj r, loop (index-1) r t
-(* end copy/paste *)
-
-(* The basic type signature of a monad *)
-module type Monad = sig
-  type 'a t
-  val return : 'a -> 'a t
-  val bind : 'a t -> ('a -> 'b t) -> 'b t
-end
-
-(* Add an operation for getting the number of a variable, and for running the
-   computation *)
-module type VarNumMonad = sig
-  include Monad
-  val inc_var : var -> unit t
-  val get_counts : int Varmap.t t
-  val run : 'a t -> 'a
-end
-
-(* Implement the monad *)
-module M : VarNumMonad = struct
-  (* A monadic computation will be a function from the current map and next
-     number to use to a new map, new next number, and result value *)
-  type 'a t = int Varmap.t -> int Varmap.t * 'a
-
-  (* return is defined as a standard state monad *)
-  let return x map = (map, x)
-
-  (* bind is defined as a standard state monad *)
-  let bind x f map =
-    let (new_map, res) = x map in
-    f res new_map
-
-  let inc_var v map =
-    try
-      let i = Varmap.find v map in
-      (Varmap.add v (i + 1) map, ())
-    with
-    | Not_found ->
-      (Varmap.add v 1 map, ())
-
-  let get_counts map = (map, map)
-
-  let run f =
-    let (_, x) = f Varmap.empty in
-    x
-end
-
-let (>>=) = M.bind
-
-let mcons p q = p >>= (fun x -> q >>= (fun y -> M.return (x::y)))
-
-let sequence (l : 'a M.t list) : 'a list M.t =
-  List.fold_right mcons l (M.return [])
-
-let mapM (f : 'a -> 'b M.t) (al : 'a list) : 'b list M.t =
-  sequence (List.map f al)
-
-let sequence_ (l : unit M.t list) : unit M.t =
-  let mcons p q = p >>= (fun x -> q >>= (fun y -> M.return ())) in
-  List.fold_right mcons l (M.return ())
-
-let mapM_ (f : 'a -> unit M.t) (al : 'a list) : unit M.t =
-  sequence_ (List.map f al)
-
-let count_vars_ae (ae : atomic_exp) : unit M.t =
+let get_vars_ae (ae : atomic_exp) (vars : Varset.t) : Varset.t =
   match ae with
-  | Ident r ->
-    M.inc_var r >>= (fun _ -> M.return ())
-  | Num x -> M.return ()
+  | Ident r -> Varset.add r vars
+  | Num x -> vars
 
-let count_vars_be (be : block_elem) : unit M.t =
+let get_vars_be (be : block_elem) (vars : Varset.t) : Varset.t =
   match be with
   | AssignOp (r, ae1, op, ae2) ->
-    M.inc_var r >>= (fun _ ->
-    count_vars_ae ae1 >>= (fun _ ->
-    count_vars_ae ae2 >>= (fun _ ->
-    M.return ())))
-  | AssignAtom (r, ae) ->
-    M.inc_var r >>= (fun _ ->
-    count_vars_ae ae >>= (fun _ ->
-    M.return ()))
+    get_vars_ae ae1 (get_vars_ae ae2 (Varset.add r vars))
+  | AssignAtom (r, ae) -> get_vars_ae ae (Varset.add r vars)
   | Ld (v1, v2, ae) ->
-    M.inc_var v1 >>= (fun _ ->
-    M.inc_var v2 >>= (fun _ ->
-    count_vars_ae ae >>= (fun _ ->
-    M.return ())))
+    get_vars_ae ae (Varset.add v1 (Varset.add v2 vars))
   | St (r, ae1, ae2) ->
-    M.inc_var r >>= (fun _ ->
-    count_vars_ae ae1 >>= (fun _ ->
-    count_vars_ae ae2 >>= (fun _ ->
-    M.return ())))
+    get_vars_ae ae1 (get_vars_ae ae2 (Varset.add r vars))
   | Call (None, f, aes) ->
-    mapM_ count_vars_ae aes >>= (fun _ ->
-    M.return ())
+    List.fold_right get_vars_ae aes vars
   | Call (Some i, f, aes) ->
-    M.inc_var i >>= (fun _ ->
-    mapM_ count_vars_ae aes >>= (fun _ ->
-    M.return ()))
+    List.fold_right get_vars_ae aes (Varset.add i vars)
   | BoundCheck (a1, a2) ->
-    count_vars_ae a1 >>= (fun _ ->
-    count_vars_ae a2 >>= (fun _ ->
-    M.return ()))
+    get_vars_ae a1 (get_vars_ae a2 vars)
 
-let count_vars_test (ae1, op, ae2) : unit M.t =
-  let vars =
-    match (ae1, ae2) with
-    | (Ident v1, Ident v2) -> [v1;v2]
-    | (Ident v1, Num _) -> [v1]
-    | (Num _, Ident v1) -> [v1]
-    | (Num _, Num _) -> []
-  in
-  mapM_ M.inc_var vars
+let get_vars_test (ae1, op, ae2) (vars : Varset.t) : Varset.t =
+  List.fold_right get_vars_ae [ae1; ae2] vars
 
-let count_vars_nb (nb : next_block) : unit M.t =
+let get_vars_nb (nb : next_block) (vars : Varset.t) : Varset.t =
   match nb with
-  | Return None -> M.return ()
-  | Return (Some v) ->
-    M.inc_var v >>= (fun _ ->
-    M.return ())
-  | Next i -> M.return ()
-  | Branch (r, t1, t2) ->
-    count_vars_test r >>= (fun _ ->
-    M.return ())
+  | Return None -> vars
+  | Return (Some v) -> Varset.add v vars
+  | Next i -> vars
+  | Branch (r, t1, t2) -> get_vars_test r vars
 
-let count_vars (cfg : cfg) : int Varmap.t =
-  let m =
-    mapM_
-      (fun e ->
-         mapM_ count_vars_be e.elems >>= (fun _ ->
-         count_vars_nb e.next >>= (fun _ ->
-         M.return ())))
-      cfg >>= (fun _ -> M.get_counts >>= M.return)
+let get_vars_block (b : cfg_entry) (vars : Varset.t) : Varset.t =
+  List.fold_right get_vars_be b.elems (get_vars_nb b.next vars)
+
+(* Get all of the variables mentioned in the cfg *)
+let get_vars (cfg : cfg) : Varset.t =
+  List.fold_right get_vars_block cfg Varset.empty
+
+let is_global v =
+  match v with
+  | NamedSource (_, SourceAst.Global) -> true
+  | _ -> false
+
+let is_param v =
+  match v with
+  | NamedSource (_, SourceAst.Parameter) -> true
+  | _ -> false
+
+let is_local v =
+  match v with
+  | NamedSource (_, SourceAst.Local) -> true
+  | NamedTmp _ -> true
+  | _ -> false
+
+(* Given the vars used in a function, allocate them into registers. Ignore the
+   live ranges and clash graph. This is the simplest strategy that will yield a
+   working program. Return also the number of stack slots used. *)
+(* TODO: actually put some locals into registers *)
+let build_regalloc_map (fun_params : (SourceAst.id * int) list) (vars : Varset.t)
+  : (var Varmap.t * int) =
+  let vars = Varset.elements vars in
+  let (globals, vars) = List.partition is_global vars in
+  let (locals, vars) = List.partition is_local vars in
+  assert (List.for_all is_param vars); (* There shouldn't be any allocated registers already *)
+  let global_map =
+    List.map
+      (fun g ->
+         match g with
+         | NamedSource (i, _) as n -> (n, Global i)
+         | _ -> assert false)
+      globals
   in
-  M.run m
+  let param_map =
+    List.map (fun (p, i) -> (id_to_var p, Vreg i)) fun_params
+  in
+  let local_map =
+    List.map2 (fun l i -> (l, Stack i)) locals (count (List.length locals))
+  in
+  let m =
+    List.fold_right (fun (k,v) m -> Varmap.add k v m)
+      (global_map @ param_map @ local_map)
+      Varmap.empty
+  in
+  (m, List.length locals)
 
 let reg_alloc_ae (map : var Varmap.t) (ae : atomic_exp) : atomic_exp =
   match ae with
@@ -216,20 +142,14 @@ let reg_alloc_nb (map : var Varmap.t) (nb : next_block) : next_block =
   | Branch (t, t1, t2) ->
     Branch (reg_alloc_test map t, t1, t2)
 
-(* The returned int is the number of variables put on the stack *)
-let reg_alloc (num_regs : int) (cfg : cfg) : (cfg * int) =
-  let counts = count_vars cfg in
-  let counts_list = Varmap.bindings counts in
-  let sorted_counts_list =
-    List.map fst (List.sort (fun (_, x) (_, y) -> compare y x) counts_list)
-  in
-  let num_regs = min num_regs (List.length sorted_counts_list) in
-  let num_stacks = List.length sorted_counts_list - num_regs in
-  let (in_regs,on_stack) = split_nth num_regs sorted_counts_list in
-  let reg_nums = List.map (fun x -> Vreg x) (count num_regs) in
-  let stack_nums = List.map (fun x -> Stack x) (count num_stacks) in
-  let alloc_list = zip in_regs reg_nums @ zip on_stack stack_nums in
-  let map = List.fold_right (fun (k,v) m -> Varmap.add k v m) alloc_list Varmap.empty in
+(* fun_params is an association list mapping the function's parameters to the
+   registers that they were passed in. num_regs is the total number of
+   registers that can be used. The returned int is the number of variables
+   put on the stack *)
+let reg_alloc (fun_params : (SourceAst.id * int) list) (num_regs : int)
+    (cfg : cfg)
+  : (cfg * int) =
+  let (map, num_stacks) = build_regalloc_map fun_params (get_vars cfg) in
   let cfg =
     List.map (fun entry -> { bnum = entry.bnum;
                              elems = List.map (reg_alloc_be map) entry.elems;

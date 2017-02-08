@@ -85,7 +85,10 @@ let compile_fun filename (globals : BlockStructure.Varset.t) (f : func)
   (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;*)
 
   let (reg_cfg, num_stack) =
-    RegAlloc.reg_alloc InstrSelX86.num_regs (List.map fst lva_cfg4) in
+    RegAlloc.reg_alloc (Util.zip (List.map fst f.params) InstrSelX86.argument_reg_numbers)
+      InstrSelX86.num_regs
+      (List.map fst lva_cfg4)
+  in
   (* printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg; *)
 
   let linear = LineariseCfg.cfg_to_linear reg_cfg in

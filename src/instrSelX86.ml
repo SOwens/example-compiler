@@ -34,36 +34,43 @@ let tok_to_binop t =
   | T.BitAnd -> Zand
   | _ -> assert false
 
-let num_regs = 11
-
 (* Save RSP and RBP for stack stuff,
    save RAX and RDX for scratch, and index RAX by -1
-   RAX and RDX are chosen because division needs them *)
+   RAX is chosen because division needs it. Alas, it also needs RDX, which is
+   used in the calling convention, so we keep R10 as scratch instead. *)
 let reg_numbers =
   [(-1, RAX);
    (0, RBX);
    (1, RCX);
-   (2, RSI);
-   (3, RDI);
-   (4, R8);
-   (5, R9);
-   (6, R10);
+   (2, RDX);
+   (3, RSI);
+   (4, RDI);
+   (5, R8);
+   (6, R9);
    (7, R11);
    (8, R12);
    (9, R13);
    (10, R14);
    (11, R15)]
+let reg_numbers_flip =
+  List.map (fun (x,y) -> (y,x)) reg_numbers
 
-(* Assume that we have kept RAX free for scratch space *)
+let reg_list = [RDI; RSI; RDX; RCX; R8; R9]
+let num_regs = List.length reg_numbers - 1
+let argument_reg_numbers =
+  List.map (fun r -> (List.assoc r reg_numbers_flip)) reg_list
+
+(* Assume that we have kept RAX and R10 free for scratch space *)
 let r_scratch = RAX
-let r_scratch2 = RDX
+let r_scratch2 = R10
 
-(* Convert a variable, which can be a register or stack slot, to a rm *)
+(* Convert a variable, which can be a register, global or stack slot, to a rm *)
 let var_to_rm (v : var) : rm =
   match v with
   | Vreg i -> Zr (List.assoc i reg_numbers)
   | Stack i -> Zm (None, Some RBP, Some (Int64.of_int (-8 * (i+1))))
-  | _ -> raise (Util.InternalError "named variable in instrSelX86")
+  | Global g -> raise (TODO "global variables")
+  | n -> raise (Util.InternalError ("named variable in instrSelX86: " ^ show_var n))
 
 let rm_rm_to_dest_src (dest_rm : rm) (src_rm : rm)
   : instruction list * dest_src =
@@ -114,6 +121,7 @@ let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
   | (_, Ident (NamedSource _ | NamedTmp _)) ->
     raise (Util.InternalError "Named variables in instrSelX86")
 
+(* TODO: avoid clobbering RDX on a division *)
 (* Build the operation for r := r op ae *)
 let build_to_reg_op (op : Tokens.op) (r : reg) (ae : atomic_exp)
   : instruction list =
@@ -213,8 +221,8 @@ let setup_arg (overwritten_regs : reg list) (dest_r : reg) (ae : atomic_exp)
                    Zm (None, Some RSP, Some (stack_reg_to_offset src_r))))
     else
       Some (Zr_rm (dest_r, Zr src_r))
-  | Ident (NamedSource _ | NamedTmp _) ->
-    raise (Util.InternalError "Named variable in instrSelX86")
+  | Ident ((NamedSource _ | NamedTmp _) as v) ->
+    raise (Util.InternalError ("Named variable in instrSelX86: " ^ show_var v))
 
 (* Move the values of aes into the registers and then the stack for argument
    passing. If ae refers to any regs in overwritten_regs, which contains the

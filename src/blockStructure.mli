@@ -73,6 +73,8 @@ type cfg_entry = { bnum : int; elems : block_elem list; next : next_block;
 
 type cfg = cfg_entry list
 
+val id_to_var : SourceAst.id -> var
+
 val show_var : var -> string
 val pp_block_elem : Format.formatter -> block_elem -> unit
 val pp_test : Format.formatter -> test -> unit

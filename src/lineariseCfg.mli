@@ -30,4 +30,6 @@ type linear_list = linear list
 
 val cfg_to_linear : cfg -> linear list
 
+val pp_linear_list : Format.formatter -> linear list -> unit
+
 val init_traversal : cfg -> cfg_entry Util.Intmap.t

@@ -18,4 +18,4 @@
 
 open BlockStructure
 
-val reg_alloc : int -> cfg -> (cfg * int)
+val reg_alloc : (SourceAst.id * int) list -> int -> cfg -> (cfg * int)
