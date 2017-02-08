@@ -170,14 +170,18 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
     lex s (Str.match_end ()) line_n
   else if Str.string_match newline_re s pos then
     lex s (Str.match_end ()) (line_n + 1)
+  else if Str.string_match ident_re s pos then
+    (* Need the let because of OCaml's right-to-left evaluation *)
+    let id = Str.matched_string s in
+    if Strmap.mem id keyword_map then
+      (* The identifier is also a keyword *)
+      let tok = Strmap.find id keyword_map in
+      (tok, line_n) :: lex s (Str.match_end ()) line_n
+    else
+      (Ident id, line_n) :: lex s (Str.match_end ()) line_n
   else if Str.string_match keyword_re s pos then
     let tok = Strmap.find (Str.matched_string s) keyword_map in
     (tok, line_n) :: lex s (Str.match_end ()) line_n
-  else if Str.string_match ident_re s pos then
-    (* Only try to match an ident if it wasn't a keyword *)
-    (* Need the let because of OCaml's right-to-left evaluation *)
-    let id = Str.matched_string s in
-    (Ident id, line_n) :: lex s (Str.match_end ()) line_n
   else if Str.string_match number_re s pos then
     let num =
       try Int64.of_string (Str.matched_string s)

@@ -450,7 +450,7 @@ let parse_var_dec (toks : T.tok_loc list) : var_dec * T.tok_loc list =
    being Let *)
 let rec parse_var_dec_list (toks : T.tok_loc list) : var_dec list * T.tok_loc list =
   match toks with
-  | ((T.Let, _) :: _) ->
+  | (T.Let, _) :: _ ->
     let (v, toks) = parse_var_dec toks in
     let (v_list, toks) = parse_var_dec_list toks in
     (v::v_list, toks)

@@ -32,8 +32,6 @@ type val_t =
   | Vint of int64
   | Varray of int list * int64 array
 
-type store_t = val_t SourceAst.Idmap.t
-
 val do_op : Tokens.op -> int64 -> int64 -> int64
 
 val interp_prog : SourceAst.prog -> unit
