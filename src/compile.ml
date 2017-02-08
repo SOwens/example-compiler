@@ -62,15 +62,27 @@ let main_function =
     body = List.map (fun d -> Assign (d.var_name, [], d.init)) prog.globals;
     loc = None }
 
+let global_id_to_var (g : SourceAst.id) : BlockStructure.var =
+  match g with
+  | Source (i, Some Global) -> BlockStructure.Global i
+  | _ -> assert false
+
+let globals =
+  List.fold_right
+    (fun d globals ->
+       BlockStructure.Varset.add (global_id_to_var d.var_name) globals)
+    prog.globals
+    BlockStructure.Varset.empty ;;
+
 let functions =
-  List.map CompileFunction.compile_fun (main_function::prog.funcs)
+  List.map (CompileFunction.compile_fun filename globals) (main_function::prog.funcs);;
 
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
 (* Assembly wrapper *)
 fprintf fmt "[section .text align=16]@\n";;
 fprintf fmt "global main@\n@\n";;
-fprintf fmt "extern exit@\n";;
+fprintf fmt "extern signal_error@\n";;
 fprintf fmt "extern input@\n";;
 fprintf fmt "extern output@\n";;
 fprintf fmt "extern allocate1@\n";;
@@ -90,6 +102,6 @@ fprintf fmt "null_error:@\n%a"
   (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 instr))
   (BlockStructure.Call (None, "signal_error", [BlockStructure.Num 1L]));;
 (* bss segment for the global variables, all initialised to 0 *)
-fprintf fmt "[section .bss align=16]@\n";;
-List.iter (fun d -> fprintf fmt "%s: dq@\n" (show_id d.var_name)) prog.globals;;
+fprintf fmt "[section .data align=16]@\n";;
+List.iter (fun d -> fprintf fmt "%s: dq 0x0@\n" (show_id d.var_name)) prog.globals;;
 close_out outfile;;

@@ -171,7 +171,6 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
   else if Str.string_match newline_re s pos then
     lex s (Str.match_end ()) (line_n + 1)
   else if Str.string_match ident_re s pos then
-    (* Need the let because of OCaml's right-to-left evaluation *)
     let id = Str.matched_string s in
     if Strmap.mem id keyword_map then
       (* The identifier is also a keyword *)

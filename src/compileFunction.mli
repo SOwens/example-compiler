@@ -18,5 +18,5 @@
 
 (* Compiler for a single function *)
 
-val compile_fun : SourceAst.func -> SourceAst.id * X86.instruction list
+val compile_fun : string -> BlockStructure.Varset.t -> SourceAst.func -> SourceAst.id * X86.instruction list
 

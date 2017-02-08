@@ -46,7 +46,7 @@ let show_scope s =
 let show_id i =
   match i with
   | Source (s, None) -> s
-  | Source (s, Some scope) -> s ^ "." ^ show_scope scope
+  | Source (s, Some scope) -> s ^ "_" ^ show_scope scope
   | Temp (s,i) -> "_tmp_" ^ s ^ string_of_int i
 
 let pp_id fmt i =

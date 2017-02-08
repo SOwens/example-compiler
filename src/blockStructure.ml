@@ -25,6 +25,7 @@ module S = SourceAst
 type var =
   | Vreg of int
   | Stack of int
+  | Global of string
   | NamedSource of string * SourceAst.scope
   | NamedTmp of string * int
 
@@ -32,6 +33,7 @@ let compare_var v1 v2 =
   match (v1, v2) with
   | (Vreg i1, Vreg i2) -> compare i1 i2
   | (Stack i1, Stack i2) -> compare i1 i2
+  | (Global s1, Global s2) -> String.compare s1 s2
   | (NamedSource (s1, scope1), NamedSource (s2, scope2)) ->
     let c = SourceAst.compare_scope scope1 scope2 in
     if c = 0 then
@@ -44,14 +46,18 @@ let compare_var v1 v2 =
       compare i1 i2
     else
       c
-  | (Vreg _, Stack _) | (Vreg _, NamedSource _) | (Vreg _, NamedTmp _)
-  | (Stack _, NamedSource _) | (Stack _, NamedTmp _) | (NamedSource _, NamedTmp _) -> -1
+  | (Vreg _, Stack _) | (Vreg _, Global _) | (Vreg _, NamedSource _)
+  | (Vreg _, NamedTmp _)
+  | (Stack _, Global _) | (Stack _, NamedSource _) | (Stack _, NamedTmp _)
+  | (Global _, NamedSource _) | (Global _, NamedTmp _)
+  | (NamedSource _, NamedTmp _) -> -1
   | _ -> 1
 
 let show_var v =
   match v with
   | Vreg i -> "r" ^ string_of_int i
   | Stack i -> "s" ^ string_of_int i
+  | Global i -> "g_" ^ i
   | NamedSource (s,_) -> s
   | NamedTmp (s, i) -> "_" ^ s ^ string_of_int i
 
@@ -194,6 +200,8 @@ let pp_cfg_entry fmt e =
 
 type cfg = cfg_entry list
 
+let pp_cfg fmt es = pp_list pp_cfg_entry fmt es
+
 let cfg_to_graphviz fmt (cfg : cfg) : unit =
   Format.fprintf fmt "digraph {@\nnode[shape=box]@\n%a@\n}"
     (fun fmt cfg ->
@@ -210,6 +218,8 @@ let cfg_to_graphviz fmt (cfg : cfg) : unit =
                    e.elems;
                  match e.next with
                  | Branch (t,_,_) -> Format.fprintf fmt "%a\\l" pp_test t
+                 | Return None -> Format.fprintf fmt "RETURN\\l"
+                 | Return (Some i) -> Format.fprintf fmt "RETURN %s\\l" (show_var i)
                  | _ -> ())
               entry;
             Format.fprintf fmt "@\n";

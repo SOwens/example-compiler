@@ -12,7 +12,7 @@ PREFIX =
 endif
 
 COMPILER = ../src/compile.byte
-EXEC_FILES = fact.exe array.exe insert_sort.exe div.exe
+EXEC_FILES = fact.exe array.exe insert_sort.exe div.exe scoping.exe runtime_errors.exe
 
 .PHONY : all clean
 

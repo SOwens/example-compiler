@@ -22,6 +22,7 @@
 type var =
   | Vreg of int
   | Stack of int
+  | Global of string
   | NamedSource of string * SourceAst.scope
   | NamedTmp of string * int
 
@@ -75,6 +76,8 @@ type cfg = cfg_entry list
 val show_var : var -> string
 val pp_block_elem : Format.formatter -> block_elem -> unit
 val pp_test : Format.formatter -> test -> unit
+val pp_cfg : Format.formatter -> cfg -> unit
+val pp_cfg_entry : Format.formatter -> cfg_entry -> unit
 val build_cfg : SourceAst.stmt list -> cfg
 
 val cfg_to_graphviz : Format.formatter -> cfg -> unit

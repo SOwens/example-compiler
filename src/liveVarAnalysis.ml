@@ -23,6 +23,19 @@ type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }
 
 type cfg = (cfg_entry * cfg_annot) list
 
+let pp_cfg_annot fmt c =
+  Format.fprintf fmt "{@[gen=%a;@ kill=%a; live_exit=%a@]}"
+    Varset.pp c.gen
+    Varset.pp c.kill
+    Varset.pp c.live_exit
+
+let pp_cfg1 fmt (c,a) =
+  Format.fprintf fmt "(@[%a@ %a@])"
+    BlockStructure.pp_cfg_entry c
+    pp_cfg_annot a
+
+let pp_cfg fmt l = pp_list pp_cfg1 fmt l
+
 (* Add the identifier in a to the generation set *)
 let add_gen (a : atomic_exp) (gen : Varset.t) : Varset.t =
   match a with
@@ -77,19 +90,46 @@ let rec find_preds n cfg =
          n = n1 || n = n2)
     cfg
 
+let add_test_vars (ae1, op, ae2) vars =
+  let vars' =
+    match ae1 with
+    | Ident v -> Varset.add v vars
+    | _ -> vars
+  in
+  match ae2 with
+    | Ident v -> Varset.add v vars'
+    | _ -> vars'
+
+(* What's live right before we are exit a block: initially if the block
+   returns, then all the globals are alive, since other parts of the code might
+   read them. Also the returned value is live. For a branch, any variable used
+   in the condition is live. *)
+let init_live_exit (globals : Varset.t) (a : cfg_annot) (next : next_block)
+  : cfg_annot =
+  match next with
+  | Return None -> { a with live_exit = globals }
+  | Return (Some i) -> { a with live_exit = Varset.add i globals }
+  | Next _ -> a
+  | Branch (i, n1, n2) ->
+    { a with live_exit = add_test_vars i Varset.empty }
+
 (* Do live variable analysis, returning an annotated cfg *)
-let lva (cfg : BlockStructure.cfg) : cfg =
-  (* Initial annotations for all of the blocks. Live_exit = {} *)
+let lva (globals : Varset.t) (cfg : BlockStructure.cfg) : cfg =
+  (* Initial annotations for all of the blocks. *)
   let init_worklist =
-    List.map (fun entry -> (entry, analyse_block entry.elems)) cfg
+    List.map
+      (fun entry ->
+         (entry,
+          init_live_exit globals (analyse_block entry.elems) entry.next))
+      cfg
   in
   (* Update one block from the worklist.
     The worklist and finished_list partition the whole cfg. That is, they must
      contain all of the blocks between them, with no duplication. NB, this is
      slightly different than the naive worklist algorithm. Here we add a
      node to the worklist only when its live_exit would change based on the current
-     nodes live_entry. *)
-  let rec do_one (worklist :cfg) (finished_list :cfg) : cfg =
+     node's live_entry. *)
+  let rec do_one (worklist : cfg) (finished_list : cfg) : cfg =
     match worklist with
     | [] -> finished_list
     | ((entry, annot) as node) :: worklist ->
@@ -105,7 +145,7 @@ let lva (cfg : BlockStructure.cfg) : cfg =
       let (possible_updates, finished) =
         find_preds entry.bnum (node::finished_list)
       in
-      (* Finished' contains all possible_updates whose live_exits are subsets
+      (* Finished' contains all possible_updates whose live_exits are supersets
          of our live entry. There is no need to update them, because no nodes would
          be added to their live_exit. updates' contains those previously finished nodes
          whose live_exits will change *)
@@ -135,6 +175,8 @@ let pure_op op : bool =
   | Tokens.Div -> false (* divide by zero *)
   | _ -> true
 
+(* Remove unused writes from elems, assuming that elems is presented backwards,
+   and live is the set of variables live on exiting the block *)
 let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
   : block_elem list =
   match elems with
@@ -172,29 +214,11 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
   | BoundCheck (a1, a2) :: b ->
     BoundCheck (a1, a2) :: local_remove_unused_writes (add_gen a1 (add_gen a2 live)) b
 
-let add_test_vars (ae1, op, ae2) vars =
-  let vars' =
-    match ae1 with
-    | Ident v -> Varset.add v vars
-    | _ -> vars
-  in
-  match ae2 with
-    | Ident v -> Varset.add v vars'
-    | _ -> vars'
-
-let add_exit_var (nb : next_block) (vars : Varset.t) : Varset.t =
-  match nb with
-  | Return None -> vars
-  | Return (Some v) -> Varset.add v vars
-  | Next _ -> vars
-  | Branch (t, _, _) -> add_test_vars t vars
-
 let remove_unused_writes (cfg : cfg) : cfg =
   List.map
     (fun (entry, annot) ->
        let new_elems =
-         local_remove_unused_writes
-           (add_exit_var entry.next annot.live_exit) (List.rev entry.elems)
+         local_remove_unused_writes annot.live_exit (List.rev entry.elems)
        in
        ({entry with elems = List.rev new_elems}, annot))
     cfg
