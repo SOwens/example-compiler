@@ -21,6 +21,7 @@
 
 open Util
 module T = Tokens
+module F = Format
 
 (* Type of identifiers. Source ones come from the original program, and Temp
    ones come from intermediate compilation stages. This makes it easy to avoid
@@ -50,7 +51,7 @@ let show_id i =
   | Temp (s,i) -> "_tmp_" ^ s ^ string_of_int i
 
 let pp_id fmt i =
-  Format.fprintf fmt "%s" (show_id i)
+  F.fprintf fmt "%s" (show_id i)
 
 (* Construct a total order on ids so that we can use them as keys in maps.
    OCaml maps are implemented with balanced binary trees *)
@@ -100,56 +101,65 @@ type exp =
   (* Allocate a new array of given dimensions. Initialise to 0 *)
   | Array of exp list
 
-let rec pp_array_list f fmt l =
+(* pretty printing for expressions *)
+
+(* Print a list, where each element is enclosed in [] *)
+let rec pp_array_list (f : F.formatter -> 'a -> unit)
+    (fmt : F.formatter) (l : 'a list)
+  : unit =
   match l with
   | [] -> ()
   | (h::t) ->
-    Format.fprintf fmt "[@[%a@]]@,%a"
+    F.fprintf fmt "[@[%a@]]@,%a"
       f h
       (pp_array_list f) t
 
-let pp_call f fmt l =
+(* Print a list, surrounded by (), separating the items with , *)
+let pp_call (f : F.formatter -> 'a -> unit) (fmt : F.formatter)
+    (l : 'a list)
+  : unit =
   let rec pp fmt l =
     match l with
     | [] -> ()
     | [h] ->
-      Format.fprintf fmt "%a"
+      F.fprintf fmt "%a"
         f h
     | (h::t) ->
-      Format.fprintf fmt "%a,@ %a"
+      F.fprintf fmt "%a,@ %a"
         f h
         pp t
   in
-  Format.fprintf fmt "(@[%a@])"
+  F.fprintf fmt "(@[%a@])"
     pp l
 
-let rec pp_exp fmt exp =
+(* Print an expression *)
+let rec pp_exp (fmt : F.formatter) (exp : exp) : unit =
   match exp with
   | Ident (id, []) ->
-    Format.fprintf fmt "%a"
+    F.fprintf fmt "%a"
       pp_id id
   | Ident (id, es) ->
-    Format.fprintf fmt "%a%a"
+    F.fprintf fmt "%a%a"
       pp_id id
       (pp_array_list pp_exp) es
   | Call (id, es) ->
-    Format.fprintf fmt "%a%a"
+    F.fprintf fmt "%a%a"
       pp_id id
       (pp_call pp_exp) es
-  | Num n -> Format.fprintf fmt "%Ld" n
-  | Bool true -> Format.fprintf fmt "true"
-  | Bool false -> Format.fprintf fmt "false"
+  | Num n -> F.fprintf fmt "%Ld" n
+  | Bool true -> F.fprintf fmt "true"
+  | Bool false -> F.fprintf fmt "false"
   | Op (e1, op, e2) ->
-    Format.fprintf fmt "(@[%a@ %s@ %a@])"
+    F.fprintf fmt "(@[%a@ %s@ %a@])"
       pp_exp e1
       (Tokens.show_op op)
       pp_exp e2
   | Uop (uop, e) ->
-    Format.fprintf fmt "@[<2>%s@ %a@]"
+    F.fprintf fmt "@[<2>%s@ %a@]"
       (Tokens.show_uop uop)
       pp_exp e
   | Array es ->
-    Format.fprintf fmt "@[<2>array@ %a@]"
+    F.fprintf fmt "@[<2>array@ %a@]"
       (pp_array_list pp_exp) es
 
 (* AST of statements *)
@@ -167,62 +177,63 @@ type stmt =
   | Return of id option
   | Loc of stmt * int (* annotate a statement with it's source line number *)
 
-let rec pp_stmt fmt stmt =
+(* Print a statement *)
+let rec pp_stmt (fmt : F.formatter) (stmt : stmt) : unit =
   match stmt with
   | Assign (id, [], e) ->
-    Format.fprintf fmt "@[<2>%a :=@ %a@]"
+    F.fprintf fmt "@[<2>%a :=@ %a@]"
       pp_id id
       pp_exp e
   | Assign (id, es, e) ->
-    Format.fprintf fmt "@[<2>%a%a :=@ %a@]"
+    F.fprintf fmt "@[<2>%a%a :=@ %a@]"
       pp_id id
       (pp_array_list pp_exp) es
       pp_exp e
   | DoWhile (Stmts [], e, s) ->
-    Format.fprintf fmt "@[<2>while@ %a@ %a@]"
+    F.fprintf fmt "@[<2>while@ %a@ %a@]"
       pp_exp e
       pp_stmt s
   | DoWhile (s, e, Stmts []) ->
-    Format.fprintf fmt "@[<2>do@ %a@ while@ %a@]"
+    F.fprintf fmt "@[<2>do@ %a@ while@ %a@]"
       pp_stmt s
       pp_exp e
   | DoWhile (s1, e, s2) ->
-    Format.fprintf fmt "@[<2>do@ %a@ while@ %a@ %a@]"
+    F.fprintf fmt "@[<2>do@ %a@ while@ %a@ %a@]"
       pp_stmt s1
       pp_exp e
       pp_stmt s2
   | Ite (e, s1, s2) ->
-    Format.fprintf fmt "@[<2>if@ %a@ then@ %a@ else@ %a@]"
+    F.fprintf fmt "@[<2>if@ %a@ then@ %a@ else@ %a@]"
       pp_exp e
       pp_stmt s1
       pp_stmt s2
   | Stmts slist ->
-    Format.fprintf fmt "{@\n%a}"
+    F.fprintf fmt "{@\n%a}"
       pp_stmts slist
   | In i ->
-    Format.fprintf fmt "@[<2>input@ %a@]"
+    F.fprintf fmt "@[<2>input@ %a@]"
       pp_id i
   | Out i ->
-    Format.fprintf fmt "@[<2>output@ %a@]"
+    F.fprintf fmt "@[<2>output@ %a@]"
       pp_id i
   | Return None ->
-    Format.fprintf fmt "return"
+    F.fprintf fmt "return"
   | Return (Some i) ->
-    Format.fprintf fmt "@[<2>return@ %a@]"
+    F.fprintf fmt "@[<2>return@ %a@]"
       pp_id i
   | Loc (s, _) ->
     pp_stmt fmt s
 
-and pp_stmts fmt (stmts : stmt list) : unit =
+and pp_stmts (fmt : F.formatter) (stmts : stmt list) : unit =
   let rec pp fmt stmts =
     match stmts with
     | [] -> ()
     | stmt::stmts ->
-      Format.fprintf fmt "%a@\n%a"
+      F.fprintf fmt "%a@\n%a"
         pp_stmt stmt
         pp stmts
   in
-  Format.fprintf fmt "@[<v>%a@]"
+  F.fprintf fmt "@[<v>%a@]"
     pp stmts
 
 (* AST of types *)
@@ -232,11 +243,12 @@ type typ =
   (* An int array with the given number of dimensions *)
   | Array of int
 
-let pp_typ fmt t =
+(* Print a type *)
+let pp_typ (fmt : F.formatter) (t : typ) : unit =
   match t with
-  | Int -> Format.fprintf fmt "int"
-  | Bool -> Format.fprintf fmt "bool"
-  | Array n -> Format.fprintf fmt "array@ %d" n
+  | Int -> F.fprintf fmt "int"
+  | Bool -> F.fprintf fmt "bool"
+  | Array n -> F.fprintf fmt "array@ %d" n
 
 (* AST of variable and function declarations *)
 type var_dec = { var_name : id; typ : typ; init : exp; loc : int option }
@@ -244,35 +256,38 @@ type var_dec = { var_name : id; typ : typ; init : exp; loc : int option }
 type func = { fun_name : id; params : (id * typ) list; ret : typ;
               locals : var_dec list; body : stmt list; loc : int option}
 
-let pp_var_dec fmt var_dec =
-  Format.fprintf fmt "@[<2>let@ %a@ :@ %a@ =@ %a@]"
-    pp_id var_dec.var_name
-    pp_typ var_dec.typ
-    pp_exp var_dec.init
+let pp_var_dec (fmt : F.formatter) (d : var_dec) : unit =
+  F.fprintf fmt "@[<2>let@ %a@ :@ %a@ =@ %a@]"
+    pp_id d.var_name
+    pp_typ d.typ
+    pp_exp d.init
 
-let pp_var_decs fmt (var_decs : var_dec list) : unit =
-  let rec pp fmt var_decs =
-    match var_decs with
+(* Print variable declarations, 1 per line *)
+let pp_var_decs (fmt : F.formatter) (decs : var_dec list) : unit =
+  let rec pp fmt decs =
+    match decs with
     | [] -> ()
-    | var_dec::var_decs ->
-      Format.fprintf fmt "%a@\n%a"
+    | var_dec::decs ->
+      F.fprintf fmt "%a@\n%a"
         pp_var_dec var_dec
-        pp var_decs
+        pp decs
   in
-  Format.fprintf fmt "@[<v>%a@]"
-    pp var_decs
+  F.fprintf fmt "@[<v>%a@]"
+    pp decs
 
-let rec pp_params fmt (params : (id * typ) list) : unit =
+(* Print function parameters *)
+let rec pp_params (fmt : F.formatter) (params : (id * typ) list) : unit =
   match params with
   | [] -> ()
   | (n,t)::params ->
-    Format.fprintf fmt "@[(%a@ :@ %a)@]@ %a"
+    F.fprintf fmt "@[(%a@ :@ %a)@]@ %a"
       pp_id n
       pp_typ t
       pp_params params
 
-let pp_func fmt func =
-  Format.fprintf fmt "@[<2>function@ %a@ %a@ :@ %a@ {@\n%a%a}@]@\n"
+(* Print a function *)
+let pp_func (fmt : F.formatter) (func : func) : unit =
+  F.fprintf fmt "@[<2>function@ %a@ %a@ :@ %a@ {@\n%a%a}@]@\n"
     pp_id func.fun_name
     pp_params func.params
     pp_typ func.ret
@@ -282,7 +297,8 @@ let pp_func fmt func =
 (* AST of complete programs *)
 type prog = { globals : var_dec list; funcs : func list }
 
-let rec pp_program fmt p =
+(* Print a program *)
+let rec pp_program (fmt : F.formatter) (p : prog) : unit =
   pp_var_decs fmt p.globals;
   List.iter (pp_func fmt) p.funcs
 
