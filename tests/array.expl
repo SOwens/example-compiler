@@ -3,6 +3,25 @@
 let r1 : int = test1(0)
 let r2 : int = test2(0)
 
+let a : array 2 = array[4][4]
+let f : int = fill(0)
+let b : array 1 = test3(a)
+let c : int = test4(0)
+
+function fill(x : int) : int {
+  let i : int = 0
+  let j : int = 0
+  while i < 4 {
+    j := 0
+    while j < 4 {
+      a[i][j] := i+j
+      j := j + 1
+    }
+    i := i + 1
+  }
+  return x
+}
+
 function test1 (x : int) : int
 {
   let i : int = 0
@@ -49,4 +68,29 @@ function test2 (x : int) : int
   o := x[2][4][6]
   output o //should print 104
   return o
+}
+
+function test3 (a : array 2) : array 1 {
+  let b : array 1 = array[4]
+  let i : int = 0
+  let j : int = 0
+  while i < 4 {
+    j := 0
+    while j < 4 {
+      b[i] := b[i] + a[i][j]
+      j := j + 1
+    }
+    i := i + 1
+  }
+  return b
+}
+
+function test4 (x : int) : int {
+  let i : int = 0
+  while i < 4 {
+    x := b[i]
+    output x // 6, 10, 14, 18
+    i := i + 1
+  }
+  return x
 }

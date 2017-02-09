@@ -168,7 +168,7 @@ let op_to_cond op =
 
 (* Don't save RAX since it is our scratch. Remember to do an even number before
    a call for alignment, which must be 16-bytes at (external) function calls.
-   This is why we also push RDX, even though it is scratch too. *)
+   This is why we also push R10, even though it is scratch too. *)
 let caller_save =
   [Zpush (Zi_rm (Zr RCX));
    Zpush (Zi_rm (Zr RDX));
