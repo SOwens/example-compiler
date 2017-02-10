@@ -66,7 +66,7 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
     let (t, scope) =
       try Idmap.find i env.vars
       with Not_found ->
-        type_error ln ("Undeclared variable " ^ show_id i)
+        type_error ln ("reference to undeclared variable " ^ show_id i)
     in
     let (ts, es') = List.split (List.map (type_exp ln env) es) in
     let l = List.length ts in
@@ -82,17 +82,17 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
          if num_dims = l && List.for_all (fun x -> x = Tint) ts then
            (Tint, annotated_exp)
          else if num_dims = l then
-           type_error ln "Array index with non-integer type"
+           type_error ln "array index with non-integer type"
          else
-           type_error ln ("Array reference with " ^ string_of_int l ^
+           type_error ln ("array reference with " ^ string_of_int l ^
                           " indices, expected " ^ string_of_int num_dims)
        | t ->
-         type_error ln ("Attempt to index non-array variable " ^ show_id i))
+         type_error ln ("attempt to index non-array variable " ^ show_id i))
   | Call (f, args) ->
     let (param_types, ret_type) =
       try Idmap.find f env.funs
       with Not_found ->
-        type_error ln ("Call to undefined function " ^ show_id f)
+        type_error ln ("call to undefined function " ^ show_id f)
     in
     let (ts, es') = List.split (List.map (type_exp ln env) args) in
     (* A local function to check that the parameter and argument types match
@@ -129,7 +129,8 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
         Tint
       | (Tint, (T.Lt | T.Eq | T.Gt), Tint) -> Tbool
       | (t1, _, t2) ->
-        type_error ln ("Operator " ^ T.show_op op ^ " applied to " ^ show_t t1 ^
+        type_error ln ("operator " ^ T.show_op op ^
+                       " applied to expressions of types " ^ show_t t1 ^
                        " and " ^ show_t t2)
     in
     (t, Op (e1', op, e2'))
@@ -138,16 +139,17 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
     (match (uop, t) with
      | (T.Not, Tbool) -> (Tbool, Uop (uop, e'))
      | (_, t) ->
-       type_error ln ("Operator " ^ T.show_uop uop ^ " applied to " ^ show_t t))
+       type_error ln ("operator " ^ T.show_uop uop ^
+                      " applied to expression of type " ^ show_t t))
   | Array es ->
     let (ts, es') = List.split (List.map (type_exp ln env) es) in
     let l = List.length ts in
     if l = 0 then
-      type_error ln "Array must have at least 1 dimension"
+      type_error ln "attempt to allocate array with 0 dimensions"
     else if List.for_all (fun x -> x = Tint) ts then
       (Tarray l, Array es')
     else
-      type_error ln "Array dimension with non-integer type"
+      type_error ln "array dimension with non-integer type"
 
 (* Type check an identifier without array indices *)
 let type_simple_ident (ln : int option) (env : env_t) (i : id) : t * id =
@@ -166,13 +168,13 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt)
   | In i ->
     let (t, i') = type_simple_ident ln env i in
     if t <> Tint then
-      type_error ln "Input with non-integer type"
+      type_error ln "input with non-integer type"
     else
       In i'
   | Out i ->
     let (t, i') = type_simple_ident ln env i in
     if t <> Tint then
-      type_error ln "Input with non-integer type"
+      type_error ln "output with non-integer type"
     else
       Out i'
   | Return (Some i) ->
@@ -183,13 +185,13 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt)
     else
       Return (Some i')
   | Return None ->
-    type_error ln "Return without value"
+    type_error ln "return without value"
   | Assign (x, es, e) ->
     (match type_exp ln env (Ident (x, es)) with
      | (t1, Ident (x', es')) ->
        let (t2, e') = type_exp ln env e in
        if t1 <> t2 then
-         type_error ln ("Assignment type mismatch: " ^ show_t t1 ^ " and " ^
+         type_error ln ("assignment to variable of type " ^ show_t t1 ^ " with type " ^
                         show_t t2)
        else
          Assign (x', es', e')
@@ -201,14 +203,14 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt)
        let s2' = type_stmt ln env return s2 in
        DoWhile (s1', e', s2')
      | _ ->
-      type_error ln "Do/while test of non-bool type")
+      type_error ln "do/while test of non-bool type")
   | Ite (e, s1, s2) ->
     (match type_exp ln env e with
      | (Tbool, e') ->
        let s1' = type_stmt ln env return s1 in
        let s2' = type_stmt ln env return s2 in
        Ite (e', s1', s2')
-     | _ -> type_error ln "If test of non-bool type")
+     | _ -> type_error ln "if test of non-bool type")
   | Stmts (s_list) ->
     Stmts (List.map (type_stmt ln env return) s_list)
   | Loc (s, ln') ->
@@ -230,7 +232,7 @@ let rec get_param_types (ln : int option) (params : (id * typ) list)
   | [] -> param_env
   | (x,t)::params ->
     if Idmap.mem x param_env then
-      type_error ln ("Duplicate function parameter " ^ show_id x)
+      type_error ln ("duplicate function parameter " ^ show_id x)
     else
       get_param_types ln params
         (Idmap.add x (source_typ_to_t t, Parameter) param_env)
@@ -244,7 +246,7 @@ let rec get_var_types (s : scope) (vars : var_dec list)
   | [] -> var_env
   | v::vars ->
     if Idmap.mem v.var_name var_env then
-      type_error v.loc ("Duplicate variable definition " ^ show_id v.var_name)
+      type_error v.loc ("duplicate variable definition " ^ show_id v.var_name)
     else
       get_var_types s vars
         (Idmap.add v.var_name (source_typ_to_t v.typ, s) var_env)
@@ -256,7 +258,9 @@ let rec type_var_dec (s : scope) (env : env_t) (dec : var_dec) : var_dec =
   if t = source_typ_to_t dec.typ then
     { dec with var_name = add_scope dec.var_name s; init = init' }
   else
-    type_error dec.loc ("variable initialisation with type " ^ show_t t)
+    type_error dec.loc ("initialisation of variable typed " ^
+                        show_t (source_typ_to_t dec.typ) ^
+                        " to expression of type " ^ show_t t)
 
 (* See the documentation for Map.merge in the OCaml standard library *)
 let merge_keep_first _ (x : 'a option) (y : 'a option) : 'a option =
@@ -316,7 +320,7 @@ let rec get_function_types (funcs : func list) (fun_env : (t list * t) Idmap.t)
   | [] -> fun_env
   | f::funcs ->
     if Idmap.mem f.fun_name fun_env then
-      type_error f.loc ("Duplicate function definition " ^ show_id f.fun_name)
+      type_error f.loc ("duplicate function definition " ^ show_id f.fun_name)
     else
       get_function_types funcs
         (Idmap.add f.fun_name
