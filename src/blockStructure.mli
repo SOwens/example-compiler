@@ -51,6 +51,7 @@ type block_elem =
   | Call of var option * string * atomic_exp list
   (* BoundCheck (a1, a2) represents assert (a1 >= 0 && a1 < a2) *)
   | BoundCheck of atomic_exp * atomic_exp
+  | NullCheck of var
 
 type basic_block = block_elem list
 

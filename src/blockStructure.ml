@@ -107,6 +107,8 @@ type block_elem =
   | Call of var option * string * atomic_exp list
   (* BoundCheck (a1, a2) represents assert (a1 >= 0 && a1 < a2) *)
   | BoundCheck of atomic_exp * atomic_exp
+  (* NullCheck v represents assert (v <> 0) *)
+  | NullCheck of var
 
 let pp_block_elem fmt be =
   match be with
@@ -144,6 +146,10 @@ let pp_block_elem fmt be =
       pp_atomic_exp a1
       pp_atomic_exp a1
       pp_atomic_exp a2
+  | NullCheck v ->
+    Format.fprintf fmt "assert (%a <> 0)"
+      pp_var v
+
 
 let show_block_elem be =
   pp_block_elem Format.str_formatter be;
@@ -274,13 +280,15 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
      | Num n ->
        [Ld (v, id_to_var id, Num (Int64.shift_left (Int64.add n 1L) 3));
         BoundCheck (ae, Ident tmp_var);
-        get_len]
+        get_len;
+        NullCheck (id_to_var id)]
      | _ ->
        [Ld (v, id_to_var id, Ident tmp_var);
         AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
         AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
-        BoundCheck (ae, Ident tmp_var);
-        get_len])
+        NullCheck (id_to_var id);
+        get_len;
+        BoundCheck (ae, Ident tmp_var);])
   | S.Ident (id, _::_::_) ->
     raise (InternalError "multi-dimension array index in blockStructure")
   | S.Num n -> [AssignAtom (v, Num n)]
@@ -370,13 +378,15 @@ let build_cfg (stmts : S.stmt list) : cfg =
            [St (id_to_var x, Num (Int64.shift_left (Int64.add n 1L) 3),
                 exp_to_atomic e);
             BoundCheck (ae, Ident tmp_var);
-            get_len]
+            get_len;
+            NullCheck (id_to_var x)]
          | _ ->
            [St (id_to_var x, Ident tmp_var, exp_to_atomic e);
             AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
             AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
             BoundCheck (ae, Ident tmp_var);
-            get_len])
+            get_len;
+            NullCheck (id_to_var x)])
       in
       find_blocks block_num (new_block_elems @ block_acc) following_block s1
     | S.Assign (x, _::_::_, e) :: s1 ->

@@ -4,7 +4,7 @@
 //let r2 : int = array_bound2(0)
 //let r3 : int = 110/0
 //let r4 : int = null(0)
-//let r5 : int = a[0]
+//let r5 : int = a[2]
 //let r6 : int = null2(a)
 let a : array 1 = array[10]
 

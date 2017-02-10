@@ -1,4 +1,3 @@
 Const prop for x * 2^n -> x shift n
-Fix division code generation to not clobber RDX
-Check for null pointer exceptions
+Either zreo out stack frames, or make the local scopes non-recursive
 Do some simple register allocation

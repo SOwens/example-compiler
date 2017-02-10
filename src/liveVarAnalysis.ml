@@ -73,6 +73,8 @@ let analyse_block (b : basic_block) : cfg_annot =
       analyse_block (add_gen_list aes (Varset.remove i gen)) (Varset.add i kill) b
     | BoundCheck (a1, a2) :: b ->
       analyse_block (add_gen a1 (add_gen a2 gen)) kill b
+    | NullCheck v :: b ->
+      analyse_block (Varset.add v gen) kill b
   in
   let (gen,kill) = analyse_block Varset.empty Varset.empty (List.rev b) in
   { gen = gen; kill = kill; live_exit = Varset.empty }
@@ -213,6 +215,8 @@ let rec local_remove_unused_writes (live : Varset.t) (elems : block_elem list)
     local_remove_unused_writes (add_gen_list aes live') b
   | BoundCheck (a1, a2) :: b ->
     BoundCheck (a1, a2) :: local_remove_unused_writes (add_gen a1 (add_gen a2 live)) b
+  | NullCheck v :: b ->
+    NullCheck v :: local_remove_unused_writes (Varset.add v live) b
 
 let remove_unused_writes (cfg : cfg) : cfg =
   List.map

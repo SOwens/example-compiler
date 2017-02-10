@@ -44,6 +44,8 @@ let get_vars_be (be : block_elem) (vars : Varset.t) : Varset.t =
     List.fold_right get_vars_ae aes (Varset.add i vars)
   | BoundCheck (a1, a2) ->
     get_vars_ae a1 (get_vars_ae a2 vars)
+  | NullCheck v ->
+    Varset.add v vars
 
 let get_vars_test (ae1, op, ae2) (vars : Varset.t) : Varset.t =
   List.fold_right get_vars_ae [ae1; ae2] vars
@@ -130,6 +132,8 @@ let reg_alloc_be (map : var Varmap.t) (be : block_elem) : block_elem =
           List.map (reg_alloc_ae map) aes)
   | BoundCheck (a1, a2) ->
     BoundCheck (reg_alloc_ae map a1, reg_alloc_ae map a2)
+  | NullCheck v ->
+    NullCheck (Varmap.find v map)
 
 let reg_alloc_test (map : var Varmap.t) (ae1, op, ae2) : test =
   (reg_alloc_ae map ae1, op, reg_alloc_ae map ae2)

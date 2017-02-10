@@ -120,7 +120,6 @@ let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
   | (_, Ident (NamedSource _ | NamedTmp _)) ->
     raise (Util.InternalError "Named variables in instrSelX86")
 
-(* TODO: avoid clobbering RDX on a division *)
 (* Build the operation for r := r op ae *)
 let build_to_reg_op (op : Tokens.op) (r : reg) (ae : atomic_exp)
   : instruction list =
@@ -354,6 +353,8 @@ let rec be_to_x86 be : instruction list =
   | BoundCheck (a1, a2) ->
     test_to_x86 a1 Lt (Num 0L) true "bound_error" @
     test_to_x86 a1 Lt a2 false "bound_error"
+  | NullCheck v ->
+    test_to_x86 (Ident v) Eq (Num 0L) true "null_error"
 
 let to_x86 (ll : L.linear list) (num_stack : int)
   : instruction list =

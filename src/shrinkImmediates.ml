@@ -130,6 +130,7 @@ let shrink_imm_elem (e : block_elem) : block_elem list =
             [e]
         end
     end
+  | NullCheck v -> [NullCheck v]
 
 let shrink_imm (cfg : cfg) : cfg =
   List.map
