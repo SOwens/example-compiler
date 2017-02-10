@@ -23,6 +23,9 @@ open Format
 
 (* We treat a local variable declarations as simple assignment to the variable.
 *)
+let init_var_dec_to_0 (d : var_dec) : stmt =
+  Assign (d.var_name, [], Num 0L)
+
 let var_dec_to_stmt (d : var_dec) : stmt =
   Assign (d.var_name, [], d.init)
 
@@ -31,7 +34,13 @@ let var_dec_to_stmt (d : var_dec) : stmt =
 *)
 let compile_fun filename (globals : BlockStructure.Varset.t) (f : func)
   : id * X86.instruction list =
-  let ast = List.map var_dec_to_stmt f.locals @ f.body in
+  let ast =
+    (* Zero out local variables, in case any of the initialisations are out of
+       order and refer to uninitialised variables. Later removal of dead writes
+       should be able to remove these where there is no problem *)
+    List.map init_var_dec_to_0 f.locals @
+    List.map var_dec_to_stmt f.locals @
+    f.body in
 
   let (_,opt_ast) = ConstProp.prop_stmts SourceAst.Idmap.empty ast in
    (*printf "@\n%a@\n" SourceAst.pp_stmts opt_ast; *)

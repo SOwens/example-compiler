@@ -1,3 +1,2 @@
 Const prop for x * 2^n -> x shift n
-Either zreo out stack frames, or make the local scopes non-recursive
 Do some simple register allocation
