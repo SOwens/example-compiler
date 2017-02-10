@@ -5,7 +5,7 @@
 //let r3 : int = 110/0
 //let r4 : int = null(0)
 //let r5 : int = a[0]
-let r6 : int = null2(a)
+//let r6 : int = null2(a)
 let a : array 1 = array[10]
 
 function array_bound1 (x : int) : int {

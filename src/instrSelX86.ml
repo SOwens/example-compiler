@@ -133,17 +133,15 @@ let build_to_reg_op (op : Tokens.op) (r : reg) (ae : atomic_exp)
     [Zimul (r, Zr r, Some i)]
   | (T.Times, Ident v) ->
     [Zimul (r, var_to_rm v, None)]
-  | (T.Div, Ident v) ->
-    [Zmov (Zrm_i (Zr RDX, 0L));
+  | (T.Div, _) ->
+    [Zmov (Zr_rm (r_scratch2, Zr RDX));
+     Zmov (Zrm_i (Zr RDX, 0L));
      Zmov (Zr_rm (RAX, Zr r));
-     Zidiv (var_to_rm v);
-     Zmov (Zr_rm (r, Zr r_scratch))]
-  | (T.Div, Num i) ->
-    [Zmov (Zrm_i (Zr RDX, 0L));
-     Zmov (Zr_rm (RAX, Zr r));
-     Zmov (Zrm_i (Zr r, i));
-     Zidiv (Zr r);
-     Zmov (Zr_rm (r, Zr r_scratch))]
+     (match ae with
+      | Ident v -> Zidiv (var_to_rm v)
+      | Num i -> Zidiv (Zr r));
+     Zmov (Zr_rm (r, Zr RAX));
+     Zmov (Zr_rm (RDX, Zr r_scratch2))]
   | ((T.Lt | T.Gt | T.Eq), _) ->
     assert false
   | ((T.And | T.Or), _) ->

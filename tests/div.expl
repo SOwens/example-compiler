@@ -1,13 +1,14 @@
 //test division
 
-let x : int = test(0)
+let x : int = test(0, 0, 100)
 
-function test(x : int) : int
+function test(x : int) (y : int) (z : int) : int
 {
   let x : int = 0
   let y : int = 0
   input x
   y := 10 / x
   output y
+  output z // output 100 (to make sure z passed in RDX is not clobbered *)
   return y
 }
