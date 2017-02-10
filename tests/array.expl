@@ -2,6 +2,7 @@
 
 let r1 : int = test1(0)
 let r2 : int = test2(0)
+let g : int = 2
 
 let a : array 2 = array[4][4]
 let f : int = fill(0)
@@ -92,5 +93,7 @@ function test4 (x : int) : int {
     output x // 6, 10, 14, 18
     i := i + 1
   }
+  x := b[g] // 14
+  output x
   return x
 }

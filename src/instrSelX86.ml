@@ -90,29 +90,28 @@ let rm_ae_to_dest_src (dest_rm : rm) (src_ae : atomic_exp)
    another variable or immediate *)
 let heap_to_rm (base : var) (offset : atomic_exp) : instruction list * rm =
   match (base, offset) with
+  (* Simple addresses *)
   | (Vreg b, Num o) ->
     ([], Zm (None, Some (List.assoc b reg_numbers), Some (Concrete_disp o)))
+  | ((Stack _ | Global _ ) as v, Num o) ->
+    ([Zmov (Zr_rm (r_scratch2, var_to_rm v))],
+     Zm (None, Some r_scratch2, Some (Concrete_disp o)))
   | (Vreg b, Ident (Vreg o)) ->
     ([],
      Zm (Some (1, List.assoc o reg_numbers),
          Some (List.assoc b reg_numbers),
          None))
-  | (Vreg b, Ident (Stack i)) ->
-    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
-     Zm (Some (1, r_scratch2),
-         Some (List.assoc b reg_numbers),
-         None))
-  | (Stack i, Num o) ->
-    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
-     Zm (None, Some r_scratch2, Some (Concrete_disp o)))
-  | (Stack i, Ident (Vreg r)) ->
-    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)))],
+  | ((Stack _ | Global _) as v, Ident (Vreg r))
+  (* 1 indirection *)
+  | (Vreg r, Ident ((Stack _ | Global _) as v)) ->
+    ([Zmov (Zr_rm (r_scratch2, var_to_rm v))],
      Zm (Some (1, List.assoc r reg_numbers),
          Some r_scratch2,
          None))
-  | (Stack i, Ident (Stack j)) ->
-    ([Zmov (Zr_rm (r_scratch2, var_to_rm (Stack i)));
-      Zbinop (Zadd, Zr_rm (r_scratch2, var_to_rm (Stack j)))],
+  (* 2 indirections *)
+  | (((Stack _ | Global _) as v1), Ident ((Stack _ | Global _) as v2)) ->
+    ([Zmov (Zr_rm (r_scratch2, var_to_rm v1));
+      Zbinop (Zadd, Zr_rm (r_scratch2, var_to_rm v2))],
      Zm (None,
          Some r_scratch2,
          None))
@@ -376,7 +375,7 @@ let to_x86 (ll : L.linear list) (num_stack : int)
           match l with
           | L.Instr be -> be_to_x86 be
           | L.Return None -> [Zleave; Zret]
-          | L.Return (Some v) -> [Zmov (Zrm_r (var_to_rm v, RAX)); Zleave; Zret]
+          | L.Return (Some v) -> [Zmov (Zr_rm (RAX, var_to_rm v)); Zleave; Zret]
           | L.CJump ((ae1, op, ae2), b, s) ->
             test_to_x86 ae1 op ae2 b s
           | L.Jump s ->
