@@ -185,14 +185,14 @@ let rec lex (s : string) (pos : int) (line_n : int) : tok_loc list =
     let num =
       try Int64.of_string (Str.matched_string s)
       with Failure _ ->
-        raise (BadInput ("Integer constant too big " ^
+        raise (BadInput ("Lex error: integer constant too big " ^
                          Str.matched_string s ^
                          " on line " ^
                          string_of_int line_n))
     in
     (Num num, line_n) :: lex s (Str.match_end ()) line_n
   else
-    raise (BadInput ("At character '" ^
+    raise (BadInput ("lex error: at character '" ^
                      String.sub s pos 1 ^
                      "' on line " ^
                      string_of_int line_n))

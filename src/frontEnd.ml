@@ -68,23 +68,28 @@ end
 let front_end (filename : string) (print_intermediates : bool) : SourceAst.prog
   =
   if Filename.check_suffix filename ".expl" then
-    let input = Std.input_file filename in
-    let toks = Tokens.lex input 0 1 in
-    if print_intermediates then
-      Format.printf "%a@\n@\n" (pp_list Tokens.pp_tok_loc) toks
-    else
-      ();
-    let ast = SourceAst.parse_program toks in
-    if print_intermediates then
-      Format.printf "%a@\n@\n" SourceAst.pp_program ast
-    else
-      ();
-    let ast2 = TypeCheck.type_prog ast in
-    if print_intermediates then
-      Format.printf "%a@\n@\n" SourceAst.pp_program ast2
-    else
-      ();
-    ast2
+    try
+      let input = Std.input_file filename in
+      let toks = Tokens.lex input 0 1 in
+      if print_intermediates then
+        Format.printf "%a@\n@\n" (pp_list Tokens.pp_tok_loc) toks
+      else
+        ();
+      let ast = SourceAst.parse_program toks in
+      if print_intermediates then
+        Format.printf "%a@\n@\n" SourceAst.pp_program ast
+      else
+        ();
+      let ast2 = TypeCheck.type_prog ast in
+      if print_intermediates then
+        Format.printf "%a@\n@\n" SourceAst.pp_program ast2
+      else
+        ();
+      ast2
+    with
+    | BadInput s ->
+      Format.printf "%s\n" s;
+      exit 1
   else
     (Format.printf "Expects filename ending in .expl\n";
      exit 1)
