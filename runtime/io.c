@@ -1,6 +1,6 @@
 /*
  * Example compiler
- * Copyright (C) 2015-2016 Scott Owens
+ * Copyright (C) 2015-2017 Scott Owens
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -43,13 +43,16 @@ void output(int64_t i) {
 }
 
 // signal an error
-void signal_error(int64_t errno) {
-  switch errno {
+void signal_error(int64_t errn) {
+  switch (errn) {
     case 0:
       printf("array bounds error\n");
       break;
     case 1:
       printf("null pointer dereference\n");
+      break;
+    default:
+      printf("unknown runtime error\n");
       break;
   }
   exit(1);
