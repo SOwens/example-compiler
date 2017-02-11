@@ -38,19 +38,20 @@ type id =
   | Source of string * scope option
   | Temp of string * int
 
-let show_scope s =
+let show_scope (s : scope) : string =
   match s with
   | Global -> "Global"
   | Parameter -> "Parameter"
   | Local -> "Local"
 
-let show_id i =
+let show_id (i : id) : string =
   match i with
   | Source (s, None) -> s
   | Source (s, Some scope) -> s ^ "_" ^ show_scope scope
   | Temp (s,i) -> "_tmp_" ^ s ^ string_of_int i
 
-let pp_id fmt i =
+(* Pretty-print an identifier *)
+let pp_id (fmt : Format.formatter) (i : id) : unit =
   F.fprintf fmt "%s" (show_id i)
 
 (* Construct a total order on ids so that we can use them as keys in maps.
@@ -61,9 +62,12 @@ let scope_to_int s =
   | Parameter -> 1
   | Local -> 2
 
-let compare_scope s1 s2 = compare (scope_to_int s1) (scope_to_int s2)
+(* Compare two scopes *)
+let compare_scope (s1 : scope) (s2 : scope) : int =
+  compare (scope_to_int s1) (scope_to_int s2)
 
-let compare_id id1 id2 =
+(* Compare two identidiers *)
+let compare_id (id1 : id) (id2 : id) : int =
   match (id1, id2) with
   | (Source (s1, scope1), Source (s2, scope2)) ->
     let c =
@@ -132,7 +136,7 @@ let pp_call (f : F.formatter -> 'a -> unit) (fmt : F.formatter)
   F.fprintf fmt "(@[%a@])"
     pp l
 
-(* Print an expression *)
+(* Pretty print an expression *)
 let rec pp_exp (fmt : F.formatter) (exp : exp) : unit =
   match exp with
   | Ident (id, []) ->
@@ -177,7 +181,7 @@ type stmt =
   | Return of id option
   | Loc of stmt * int (* annotate a statement with it's source line number *)
 
-(* Print a statement *)
+(* Pretty-print a statement *)
 let rec pp_stmt (fmt : F.formatter) (stmt : stmt) : unit =
   match stmt with
   | Assign (id, [], e) ->
@@ -243,7 +247,7 @@ type typ =
   (* An int array with the given number of dimensions *)
   | Array of int
 
-(* Print a type *)
+(* Pretty-print a type *)
 let pp_typ (fmt : F.formatter) (t : typ) : unit =
   match t with
   | Int -> F.fprintf fmt "int"
@@ -256,13 +260,14 @@ type var_dec = { var_name : id; typ : typ; init : exp; loc : int option }
 type func = { fun_name : id; params : (id * typ) list; ret : typ;
               locals : var_dec list; body : stmt list; loc : int option}
 
+(* Pretty-print a variable declaration *)
 let pp_var_dec (fmt : F.formatter) (d : var_dec) : unit =
   F.fprintf fmt "@[<2>let@ %a@ :@ %a@ =@ %a@]"
     pp_id d.var_name
     pp_typ d.typ
     pp_exp d.init
 
-(* Print variable declarations, 1 per line *)
+(* Pretty-print variable declarations, 1 per line *)
 let pp_var_decs (fmt : F.formatter) (decs : var_dec list) : unit =
   let rec pp fmt decs =
     match decs with
@@ -275,7 +280,7 @@ let pp_var_decs (fmt : F.formatter) (decs : var_dec list) : unit =
   F.fprintf fmt "@[<v>%a@]"
     pp decs
 
-(* Print function parameters *)
+(* Pretty-print function parameters *)
 let rec pp_params (fmt : F.formatter) (params : (id * typ) list) : unit =
   match params with
   | [] -> ()
@@ -285,7 +290,7 @@ let rec pp_params (fmt : F.formatter) (params : (id * typ) list) : unit =
       pp_typ t
       pp_params params
 
-(* Print a function *)
+(* Pretty-print a function *)
 let pp_func (fmt : F.formatter) (func : func) : unit =
   F.fprintf fmt "@[<2>function@ %a@ %a@ :@ %a@ {@\n%a%a}@]@\n"
     pp_id func.fun_name
@@ -297,7 +302,7 @@ let pp_func (fmt : F.formatter) (func : func) : unit =
 (* AST of complete programs *)
 type prog = { globals : var_dec list; funcs : func list }
 
-(* Print a program *)
+(* Pretty-print a program *)
 let rec pp_program (fmt : F.formatter) (p : prog) : unit =
   pp_var_decs fmt p.globals;
   List.iter (pp_func fmt) p.funcs
@@ -306,11 +311,24 @@ let rec pp_program (fmt : F.formatter) (p : prog) : unit =
 let parse_error (ln : int) (msg : string) : 'a =
   raise (BadInput ("Parse error on line " ^ string_of_int ln ^ ": " ^ msg))
 
+(* Raise a parse error explaining the expected token and the token actually there *)
+let parse_error_expect (ln : int) (given : T.token) (expect : T.token)
+    (where : string)
+  : 'a =
+  raise (BadInput ("Parse error on line " ^ string_of_int ln ^ ": expected " ^
+                   T.show_token expect ^ " in " ^ where ^ " but found " ^
+                   T.show_token given))
+
+
+(* Raise a parse error because the end of file was reached unexpectedly *)
+let eof_error (expect : string) : 'a =
+  raise (BadInput ("Parse error: end of file while parsing " ^ expect))
+
 (* Convert the first expression in toks into an AST. Return it with the left
    over tokens. *)
 let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   match toks with
-  | [] -> raise (BadInput "End of file while parsing an expression")
+  | [] -> eof_error "an expression"
   | (T.Ident i, ln) :: (T.Lparen, _) ::toks ->
     let (args, toks) = parse_args ln toks in
     (Call (Source (i,None), args), toks)
@@ -331,11 +349,13 @@ let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
     (Array indices, toks)
   | (T.Lparen, ln) :: toks ->
     (match parse_exp toks with
+     | (_, []) -> eof_error "a parenthesized expression"
      | (e, (T.Rparen, _) :: toks) ->
        (e, toks)
-     | _ -> parse_error ln "'(' without matching ')'")
-  | (_, ln) :: _ ->
-    parse_error ln "Bad expression"
+     | (_, (t, ln)::_) ->
+       parse_error_expect ln t T.Rparen "a parenthesized expression")
+  | (t, ln) :: _ ->
+    parse_error ln ("bad expression, beginning with " ^ T.show_token t)
 
 and parse_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   match parse_atomic_exp toks with
@@ -349,62 +369,76 @@ and parse_indices (toks : T.tok_loc list) : exp list * T.tok_loc list =
   match toks with
   | (T.Lbrac, l) :: toks ->
     (match parse_exp toks with
+     | (_, []) -> eof_error "an array index"
      | (e, (T.Rbrac, _) :: toks) ->
        let (es,toks) = parse_indices toks in
        (e::es, toks)
-     | _ -> parse_error l "'[' without matching ']'")
+     | (_, (t, ln) :: _) ->
+       parse_error_expect ln t T.Rbrac "an array index")
   | _ -> ([], toks)
 
 (* Parse 1 or more comma-separated expressions. Return them with the left over
    tokens. End on a closing parenthesis *)
 and parse_args ln (toks : T.tok_loc list) : exp list * T.tok_loc list =
   match parse_exp toks with
+  | (_, []) -> eof_error "a function call expression"
   | (e, (T.Comma, _)::toks) ->
     let (es, toks) = parse_args ln toks in
     (e::es, toks)
   | (e, (T.Rparen, _)::toks) ->
     ([e], toks)
-  | _ ->
-    parse_error ln "expected ) or , in function argument"
+  | (_, (t, ln) :: _) ->
+    parse_error ln ("expected " ^ T.show_token T.Comma ^ " or " ^
+                    T.show_token T.Rparen ^
+                    " in a function call expression but found " ^
+                    T.show_token t)
 
 (* Convert the first statement in toks into an AST. Return it with the left
    over tokens *)
 let rec parse_stmt (toks : T.tok_loc list) : stmt * T.tok_loc list =
   match toks with
-  | [] -> raise (BadInput "End of file while parsing a statement")
+  | [] -> eof_error "a statement"
   | (T.Ident x, ln) :: toks ->
     (match parse_indices toks with
+     | (_, []) -> eof_error "an assignment statement"
      | (indices, (T.Assign, _) :: toks) ->
        let (e, toks) = parse_exp toks in
        (Loc (Assign (Source (x, None), indices, e), ln), toks)
-     |_ -> parse_error ln "expected ':=' after identifier")
+     | (_, (t, ln) :: _) ->
+       parse_error_expect ln t T.Assign "an assignment statement")
   | (T.While, ln) :: toks ->
     let (e, toks) = parse_exp toks in
     let (s, toks) = parse_stmt toks in
     (Loc (DoWhile (Stmts [], e, s), ln), toks)
   | (T.Do, ln) :: toks ->
     (match parse_stmt toks with
+     | (_, []) -> eof_error "a do statement"
      | (s, (T.While, _)::toks) ->
        let (e, toks) = parse_exp toks in
        (Loc (DoWhile (s, e, Stmts []), ln), toks)
-     | _ -> parse_error ln "'do' without 'while'")
+     | (_, (t, ln) :: _) ->
+       parse_error_expect ln t T.While "a do statement")
   | (T.If, ln) :: toks ->
     (match parse_exp toks with
+     | (_, []) -> eof_error "an if statement"
      | (e, (T.Then, _) :: toks) ->
        (match parse_stmt toks with
+        | (_, []) -> eof_error "an if statement"
         | (s1, (T.Else, _) :: toks) ->
           let (s2, toks) = parse_stmt toks in
           (Loc (Ite (e, s1, s2), ln), toks)
-        | _ -> parse_error ln "'if' without 'else'")
-     | _ ->  parse_error ln "'if' without 'then")
+        | (_, (t, ln) :: _) ->
+          parse_error_expect ln t T.Else "an if statement")
+     | (_, (t, ln) :: _) ->
+       parse_error_expect ln t T.Then "an if statement")
   | (T.Lcurly, ln) :: toks ->
     let (s_list, toks) = parse_stmt_list toks in
     (Loc (Stmts (s_list), ln), toks)
   | (T.Input, ln) :: (T.Ident x, _) :: toks -> (Loc (In (Source (x,None)), ln), toks)
   | (T.Output, ln) :: (T.Ident x, _) :: toks -> (Loc (Out (Source (x,None)), ln), toks)
   | (T.Return, ln) :: (T.Ident x, _) :: toks -> (Loc (Return (Some (Source (x,None))), ln), toks)
-  | (_,ln) :: _ ->
-    parse_error ln "Bad statement"
+  | (t, ln) :: _ ->
+    parse_error ln ("bad statement, beginning with a " ^ T.show_token t)
 
 (* Convert all of the statement in toks into an AST, stopping on a }. Return
    them with the left over tokens, not including the } *)
@@ -420,23 +454,26 @@ and parse_stmt_list (toks : T.tok_loc list) : stmt list * T.tok_loc list =
    tokens. *)
 let parse_typ (toks : T.tok_loc list) : typ * T.tok_loc list =
   match toks with
-  | [] -> raise (BadInput "End of file while parsing a type")
+  | [] -> eof_error "a type"
   | (T.Int, _) :: toks -> (Int, toks)
   | (T.Bool, _) :: toks -> (Bool, toks)
   | (T.Array, _) :: (T.Num n, _) :: toks -> (Array (Int64.to_int n), toks)
-  | (_,ln) :: _ -> parse_error ln "Bad type"
+  | (t,ln) :: _ ->
+    parse_error ln ("bad type, beginning with a " ^ T.show_token t)
 
 (* Convert the first funciton parameter toks into an AST. Return it with the
    left over tokens. *)
 let parse_param (toks : T.tok_loc list) : (id * typ) * T.tok_loc list =
   match toks with
-  | [] -> raise (BadInput "End of file while parsing a function parameter")
+  | [] -> eof_error "a function parameter"
   | (T.Lparen, ln) :: (T.Ident x, _) :: (T.Colon,_) :: toks ->
     (match parse_typ toks with
+     | (_, []) -> eof_error "a function parameter"
      | (t, (T.Rparen, _)::toks) ->
        ((Source (x,None), t), toks)
-     | _ -> parse_error ln "function parameter missing )")
-  | (_,ln)::_ -> parse_error ln "bad function parameter"
+     | (_, (t, ln) :: _) ->
+       parse_error_expect ln t T.Rparen "a function parameter")
+  | (t, ln) :: _ -> parse_error_expect ln t T.Lparen "a function parameter"
 
 (* Convert a list of function parameters in toks into an AST. Return it with
    the left over tokens. Recognise when the list is over by the next token not
@@ -454,14 +491,16 @@ let rec parse_param_list (toks : T.tok_loc list) : (id * typ) list * T.tok_loc l
    the left over tokens. *)
 let parse_var_dec (toks : T.tok_loc list) : var_dec * T.tok_loc list =
   match toks with
-  | [] -> raise (BadInput "End of file while parsing a variable declaration")
+  | [] -> eof_error "a variable declaration"
   | (T.Let, ln) :: (T.Ident x, _) :: (T.Colon,_) :: toks ->
     (match parse_typ toks with
+     | (_, []) -> eof_error "a variable declaration"
      | (t, (T.Op T.Eq, _)::toks) ->
        let (e, toks) = parse_exp toks in
        ({ var_name = Source (x,None); typ = t; init = e; loc = Some ln }, toks)
-     | _ -> parse_error ln "variable declaration missing =")
-  | (_,ln)::_ -> parse_error ln "bad variable declaration"
+     | (_, (t, ln) :: _) ->
+       parse_error_expect ln t (T.Op T.Eq) "a variable declaration")
+  | (t, ln) :: _ -> parse_error_expect ln t T.Let "a variable declaration"
 
 (* Convert a list of variable declaration in toks into an AST. Return it with
    the left over tokens. Recognise when the list is over by the next token not
@@ -478,26 +517,31 @@ let rec parse_var_dec_list (toks : T.tok_loc list) : var_dec list * T.tok_loc li
    the left over tokens. *)
 let parse_func (toks : T.tok_loc list) : func * T.tok_loc list =
   match toks with
-  | [] -> raise (BadInput "End of file while parsing a function declaration")
+  | [] -> eof_error "a function declaration"
   | (T.Function, ln) :: (T.Ident x, _) :: toks ->
-     (match parse_param_list toks with
-      | (params, (T.Colon, _) :: toks) ->
-        if List.length params <> 0 then
-          (match parse_typ toks with
-           | (t, (T.Lcurly, _) :: toks) ->
-             let (var_decs, toks) = parse_var_dec_list toks in
-             let (stmts, toks) = parse_stmt_list toks in
-             ({ fun_name = Source (x,None);
-                params = params;
-                ret = t;
-                locals = var_decs;
-                body = stmts;
-                loc = Some ln }, toks)
-           | _ -> parse_error ln "bad function declaration, missing {")
-        else
-          parse_error ln "functions must have at least 1 parameter"
-      | _ -> parse_error ln "bad function declaration, missing :")
-  | (_,ln)::_ -> parse_error ln "bad function declaration"
+    (match parse_param_list toks with
+     | (_, []) -> eof_error "a function declaration"
+     | (params, (T.Colon, _) :: toks) ->
+       if List.length params <> 0 then
+         (match parse_typ toks with
+          | (t, []) -> eof_error "a function declaration"
+          | (t, (T.Lcurly, _) :: toks) ->
+            let (var_decs, toks) = parse_var_dec_list toks in
+            let (stmts, toks) = parse_stmt_list toks in
+            ({ fun_name = Source (x,None);
+               params = params;
+               ret = t;
+               locals = var_decs;
+               body = stmts;
+               loc = Some ln }, toks)
+          | (_, (t, ln) :: _) ->
+            parse_error_expect ln t T.Lcurly "a function declaration")
+       else
+         parse_error ln
+           "bad function declaration, functions must have at least 1 parameter"
+     | (_, (t, ln) :: _) ->
+       parse_error_expect ln t T.Colon "a function declaration")
+  | (t, ln) :: _ -> parse_error_expect ln t T.Function "a function declaration"
 
 (* Parse global variable declarations, and then function declarations until the
    end of file *)

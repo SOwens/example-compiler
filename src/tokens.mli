@@ -23,14 +23,14 @@ type op =
   | Minus
   | Times
   | Div
+  | Lshift
+  | BitOr
+  | BitAnd
   | Lt
   | Gt
   | Eq
   | And
   | Or
-  | Lshift
-  | BitOr
-  | BitAnd
 
 type uop =
   | Not
@@ -46,6 +46,8 @@ type token =
   | Rcurly
   | Lbrac
   | Rbrac
+  | Colon
+  | Comma
   | While
   | Do
   | If
@@ -59,15 +61,14 @@ type token =
   | Array
   | Int
   | Bool
-  | Colon
   | Let
   | Function
   | Return
-  | Comma
 
 type tok_loc = (token * int)
 
 val show_uop : uop -> string
 val show_op : op -> string
+val show_token : token -> string
 val pp_tok_loc : Format.formatter -> tok_loc -> unit
 val lex : string -> int -> int -> tok_loc list

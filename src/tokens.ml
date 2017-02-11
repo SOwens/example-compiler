@@ -21,25 +21,30 @@
 open Util
 
 (* Primitive operators *)
-(* When extending with impure operators, be careful to check the rest of the
-   compiler where it depends on purity. Right now only Div is impure
-   (divide-by-zero) *)
+(* When extending with operators that can have side effects, be careful to
+   check the rest of the compiler. Some optimisations can only be done on
+   side-effect-free operations. Right now only Div can have an effect
+   (divide-by-zero exception) *)
 
 type op =
+  (* integer operations *)
   | Plus
   | Minus
   | Times
   | Div
-  | Lt
-  | Gt
-  | Eq
-  | And
-  | Or
   | Lshift
   | BitOr
   | BitAnd
+  (* comparisons *)
+  | Lt
+  | Gt
+  | Eq
+  (* boolean operations *)
+  | And
+  | Or
 
 type uop =
+  (* boolean negation *)
   | Not
 
 let show_op op =
@@ -57,21 +62,26 @@ let show_op op =
   | BitOr -> "|"
   | BitAnd -> "&"
 
-let show_uop uop =
+let show_uop (uop : uop) : string =
   match uop with
   | Not -> "!"
 
 type token =
   | Num of int64
-  | Ident of string
+  | Ident of string (* identifiers represent various names, including function
+                       and variable names *)
   | Op of op
   | Uop of uop
+  (* Punctuation *)
   | Lparen
   | Rparen
   | Lcurly
   | Rcurly
   | Lbrac
   | Rbrac
+  | Colon
+  | Comma
+  (* Identifier-like keywords *)
   | While
   | Do
   | If
@@ -85,14 +95,12 @@ type token =
   | Array
   | Int
   | Bool
-  | Colon
   | Let
   | Function
   | Return
-  | Comma
 
-let show_token token =
-  match token with
+let show_token (t : token) : string =
+  match t with
   | Num i -> Int64.to_string i
   | Ident s -> s
   | Op o -> show_op o
@@ -103,6 +111,8 @@ let show_token token =
   | Rcurly -> "}"
   | Lbrac -> "["
   | Rbrac -> "]"
+  | Comma -> ","
+  | Colon -> ":"
   | While -> "while"
   | Do -> "do"
   | If -> "if"
@@ -116,19 +126,19 @@ let show_token token =
   | Array -> "array"
   | Int -> "int"
   | Bool -> "bool"
-  | Colon -> ":"
   | Let -> "let"
   | Function -> "function"
   | Return -> "return"
-  | Comma -> ","
 
-let pp_token fmt token =
-  Format.fprintf fmt "%s" (show_token token)
+(* Pretty-print a token *)
+let pp_token (fmt : Format.formatter) (t : token) =
+  Format.fprintf fmt "%s" (show_token t)
 
 (* Tokens annotated with which line number they appear on *)
 type tok_loc = (token * int)
 
-let pp_tok_loc fmt (t, l) =
+(* Pretty-print a token and location *)
+let pp_tok_loc (fmt : Format.formatter) ((t, l) : tok_loc) =
   Format.fprintf fmt "(%a, %d)" pp_token t l
 
 (* The mapping of keword strings to the corresponding tokens *)
