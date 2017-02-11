@@ -286,9 +286,9 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
        [Ld (v, id_to_var id, Ident tmp_var);
         AssignOp (tmp_var, Ident tmp_var, Tokens.Lshift, Num 3L);
         AssignOp (tmp_var, ae, Tokens.Plus, Num 1L);
-        NullCheck (id_to_var id);
+        BoundCheck (ae, Ident tmp_var);
         get_len;
-        BoundCheck (ae, Ident tmp_var);])
+        NullCheck (id_to_var id)])
   | S.Ident (id, _::_::_) ->
     raise (InternalError "multi-dimension array index in blockStructure")
   | S.Num n -> [AssignAtom (v, Num n)]
