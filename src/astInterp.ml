@@ -50,7 +50,7 @@ let val_t_to_array (v : val_t) : int list * int64 array =
   | Varray (dims, a) -> (dims, a)
 
 (* Given the array's dimensions, work out the slot for a particular set of
-   indices. sizes and indices must have the same length.  Return None if one
+   indices. Sizes and indices must have the same length.  Return None if one
    of the indices is out of bounds, i.e. greater than the size. *)
 let array_address (sizes : int list) (indices : int list) : int option =
   (* acc keeps track of the product of the dimensions seen so far *)
@@ -73,7 +73,7 @@ let bool_to_int64 (b : bool) : int64 =
 let int64_to_bool (i : int64) : bool =
   if Int64.compare i 0L = 0 then false else true
 
-(* Do a primitive operation *)
+(* Do a primitive operation, but not && or || *)
 let do_op op (n1 : int64) (n2 : int64) : int64 =
   match op with
   | T.Plus -> Int64.add n1 n2

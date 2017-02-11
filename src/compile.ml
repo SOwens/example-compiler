@@ -16,7 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* The main driver for the compiler *)
+(* The main driver for the compiler executable. *)
 
 open Util
 open Format
@@ -25,11 +25,12 @@ open Format
 let filename_ref = ref None;;
 let safe_ref = ref true;;
 
-let options = Arg.align ([("-safe", Arg.Bool (fun b -> safe_ref := b), "\tdo null pointer and array bounds checks")
+let options = Arg.align ([("-safe", Arg.Bool (fun b -> safe_ref := b),
+                           "\tdo null pointer and array bounds checks")
  ]);;
 
 let usage_msg =
-  "example compiler \nexample usage:       compile.byte test.expl\n"
+  "example compiler \nexample usage:    " ^ Sys.argv.(0)^ " test.expl\n"
 
 let _ =
   Arg.parse options

@@ -21,7 +21,7 @@
 let filename = ref None;;
 
 let usage_msg =
-  "example interpreter \nexample usage:       interp.byte test.expl\n";;
+  "example interpreter \nexample usage:    " ^ Sys.argv.(0)^ " test.expl\n";;
 
 let _ =
   Arg.parse []
