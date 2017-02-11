@@ -10,7 +10,6 @@ function test (i : int) : int
   let y : int = 0
   input len
   a := array[len]
-  i := 0
   while i < len {
     input y
     a[i] := y
