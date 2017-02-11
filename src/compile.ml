@@ -23,8 +23,9 @@ open Format
 
 (* Command-line arguments *)
 let filename_ref = ref None;;
+let safe_ref = ref true;;
 
-let options = Arg.align ([
+let options = Arg.align ([("-safe", Arg.Bool (fun b -> safe_ref := b), "\tdo null pointer and array bounds checks")
  ]);;
 
 let usage_msg =
@@ -76,7 +77,8 @@ let globals =
     BlockStructure.Varset.empty ;;
 
 let functions =
-  List.map (CompileFunction.compile_fun filename globals) (main_function::prog.funcs);;
+  List.map (CompileFunction.compile_fun !safe_ref filename globals)
+    (main_function::prog.funcs);;
 
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;
@@ -97,10 +99,10 @@ List.iter
   (fun (name, code) -> fprintf fmt "%s:@\n%a" (show_id name) X86.pp_instr_list code)
   functions;;
 fprintf fmt "bound_error:@\n%a"
-  (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 instr))
+  (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 !safe_ref instr))
   (BlockStructure.Call (None, "signal_error", [BlockStructure.Num 0L]));;
 fprintf fmt "null_error:@\n%a"
-  (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 instr))
+  (fun fmt instr -> X86.pp_instr_list fmt (InstrSelX86.be_to_x86 !safe_ref instr))
   (BlockStructure.Call (None, "signal_error", [BlockStructure.Num 1L]));;
 (* bss segment for the global variables, all initialised to 0 *)
 fprintf fmt "[section .bss align=16]@\n";;

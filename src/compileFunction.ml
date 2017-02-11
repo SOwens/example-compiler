@@ -32,7 +32,7 @@ let var_dec_to_stmt (d : var_dec) : stmt =
 (* globals should contain all globals variables, so that we can tell the live
    variable analysis that they must be live when the function returns.
 *)
-let compile_fun filename (globals : BlockStructure.Varset.t) (f : func)
+let compile_fun safe filename (globals : BlockStructure.Varset.t) (f : func)
   : id * X86.instruction list =
   let ast =
     (* Zero out local variables, in case any of the initialisations are out of
@@ -103,6 +103,6 @@ let compile_fun filename (globals : BlockStructure.Varset.t) (f : func)
   let linear = LineariseCfg.cfg_to_linear reg_cfg in
   (* printf "@\n%a@\n" LineariseCfg.pp_linear_list linear; *)
 
-  let x86 = InstrSelX86.to_x86 linear num_stack in
+  let x86 = InstrSelX86.to_x86 safe linear num_stack in
 
   (f.fun_name, x86)
