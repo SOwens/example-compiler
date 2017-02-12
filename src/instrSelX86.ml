@@ -138,7 +138,8 @@ let build_to_reg_op (op : Tokens.op) (r : reg) (ae : atomic_exp)
      Zmov (Zr_rm (RAX, Zr r));
      (match ae with
       | Ident v -> Zidiv (var_to_rm v)
-      | Num i -> Zidiv (Zr r));
+      | Num i ->
+        raise (Util.InternalError "Division by immediate constant"));
      Zmov (Zr_rm (r, Zr RAX));
      Zmov (Zr_rm (RDX, Zr r_scratch2))]
   | ((T.Lt | T.Gt | T.Eq), _) ->

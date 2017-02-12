@@ -18,7 +18,9 @@
 
 (* Ensure that all immediate arguments fit into 32 bits.  We assume that
    constant propagation has ensured that no operation has two immediate
-   arguments, and we maintain that property here. *)
+   operands, and we maintain that property here. Also, remove immediate
+   operands from division, since the x86 signed division does not support them.
+*)
 
 open BlockStructure
 
@@ -38,8 +40,8 @@ let is_imm (a : atomic_exp) : bool =
   | Ident _ -> false
   | Num _ -> true
 
-(* If the atomic_exp is a large immediate constant (takes more thatn 32 bits),
-   then return the int64, else None. Relies on int64 being 2s complement. It
+(* If the atomic_exp is a large immediate constant (takes more than 32 bits),
+   then return the int64, else None. Relies on int64 being 2s complement. If
    it's negative (the top bit is 1), then check that the top 33 bits are 1. It
    it's non-negative, check that the top 33 bits are 0. 32 won't suffice,
    because when we truncate to 32 bits only, the top bit needs to be the sign
@@ -56,51 +58,57 @@ let get_large_imm (a : atomic_exp) : int64 option =
       Some n
   | _ -> None
 
+module T = Tokens
+
 let shrink_imm_elem (e : block_elem) : block_elem list =
   match e with
+  | AssignOp (dest, a1, T.Div, a2) ->
+    (* division cannot have immediate operands *)
+    if is_imm a1 && is_imm a2 then
+      [AssignAtom (tmp_var, a1);
+       AssignAtom (tmp_var2, a2);
+       AssignOp (dest, Ident tmp_var, T.Div, Ident tmp_var2)]
+    else if is_imm a1 then
+      [AssignAtom (tmp_var, a1);
+       AssignOp (dest, Ident tmp_var, T.Div, a2)]
+    else if is_imm a2 then
+      [AssignAtom (tmp_var, a2);
+       AssignOp (dest, a1, T.Div, Ident tmp_var)]
+    else
+      [e]
   | AssignOp (dest, a1, op, a2) ->
     assert (not (is_imm a1 && is_imm a2));
-    begin
-      match get_large_imm a1 with
-      | Some n ->
-        assign_imm tmp_var n @
-        [AssignOp (dest, Ident tmp_var, op, a2)]
-      | None ->
-        begin
-          match get_large_imm a2 with
-          | Some n ->
-            assign_imm tmp_var n @
-            [AssignOp (dest, a1, op, Ident tmp_var)]
-          | None ->
-            [e]
-        end
-    end
+    (match get_large_imm a1 with
+     | Some n ->
+       assign_imm tmp_var n @
+       [AssignOp (dest, Ident tmp_var, op, a2)]
+     | None ->
+       (match get_large_imm a2 with
+        | Some n ->
+          assign_imm tmp_var n @
+          [AssignOp (dest, a1, op, Ident tmp_var)]
+        | None ->
+          [e]))
   | AssignAtom (dest, a) ->
-    begin
-      match get_large_imm a with
-      | Some n -> assign_imm dest n
-      | None -> [e]
-    end
+    (match get_large_imm a with
+     | Some n -> assign_imm dest n
+     | None -> [e])
   | Ld (v1, v2, a) ->
-    begin
-      match get_large_imm a with
-      | Some n ->
-        assign_imm tmp_var n @ [Ld(v1, v2, Ident tmp_var)]
-      | None -> [e]
-    end
+    (match get_large_imm a with
+     | Some n ->
+       assign_imm tmp_var n @ [Ld(v1, v2, Ident tmp_var)]
+     | None -> [e])
   | St (r, a1, a2) ->
-    begin
-      match (get_large_imm a1, get_large_imm a2) with
-      | (None, None) -> [e]
-      | (Some n1, None) ->
-        assign_imm tmp_var n1 @ [St(r, Ident tmp_var, a2)]
-      | (None, Some n2) ->
-        assign_imm tmp_var n2 @ [St(r, a1, Ident tmp_var)]
-      | (Some n1, Some n2) ->
-        assign_imm tmp_var n1 @
-        assign_imm tmp_var2 n2 @
-        [St(r, Ident tmp_var, Ident tmp_var2)]
-    end
+    (match (get_large_imm a1, get_large_imm a2) with
+     | (None, None) -> [e]
+     | (Some n1, None) ->
+       assign_imm tmp_var n1 @ [St(r, Ident tmp_var, a2)]
+     | (None, Some n2) ->
+       assign_imm tmp_var n2 @ [St(r, a1, Ident tmp_var)]
+     | (Some n1, Some n2) ->
+       assign_imm tmp_var n1 @
+       assign_imm tmp_var2 n2 @
+       [St(r, Ident tmp_var, Ident tmp_var2)])
   | Call (v, f, aes) ->
     let (s, es, _) =
       List.fold_right
@@ -115,21 +123,17 @@ let shrink_imm_elem (e : block_elem) : block_elem list =
     s @ [Call (v, f, es)]
   | BoundCheck (a1, a2) ->
     assert (not (is_imm a1 && is_imm a2));
-    begin
-      match get_large_imm a1 with
-      | Some n ->
-        assign_imm tmp_var n @
-        [BoundCheck (Ident tmp_var, a2)]
-      | None ->
-        begin
-          match get_large_imm a2 with
-          | Some n ->
-            assign_imm tmp_var n @
-            [BoundCheck (a1, Ident tmp_var)]
-          | None ->
-            [e]
-        end
-    end
+    (match get_large_imm a1 with
+     | Some n ->
+       assign_imm tmp_var n @
+       [BoundCheck (Ident tmp_var, a2)]
+     | None ->
+       (match get_large_imm a2 with
+        | Some n ->
+          assign_imm tmp_var n @
+          [BoundCheck (a1, Ident tmp_var)]
+        | None ->
+          [e]))
   | NullCheck v -> [NullCheck v]
 
 let shrink_imm (cfg : cfg) : cfg =

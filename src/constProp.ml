@@ -16,7 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-(* Do constant propagation and folding *)
+(* Do constant propagation and folding. Later compiler phases assume that no
+   operation has 2 constant arguments, so this needs to be guaranteed here. *)
 
 open Util
 open SourceAst
@@ -25,7 +26,7 @@ module T = Tokens
 (* Return n, such that 2^n = i, or None if there is no such *)
 let log2 (i : int64) : int option =
   (* Linear search for the least significant 1 in the binary represenatation.
-     A binary search might be faster, but maybe not worth the hassle? *)
+     A binary search might be faster, but probably not worth the hassle. *)
   let rec f (i : int64) (shifted : int) : int option =
     if Int64.logand i 0x1L = 0L then
       f (Int64.shift_right i 1) (shifted + 1)
@@ -113,6 +114,11 @@ let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
 
      (* Div *)
      | (Num n1, T.Div, Num n2) when n2 <> 0L -> Num (Int64.div n1 n2)
+     | (Num n1, T.Div, Num 0L) ->
+       (* This phase needs to guarantee that no operation has two constant
+          arguments. It doesn't matter what the numerator is, when the
+          divisor is 0, so we can just use an arbitrary variable. *)
+       Op (Ident (Temp ("CP", 0), []), T.Div, Num 0L)
      | (e, T.Div, Num 1L) -> e
 
      (* Less *)
