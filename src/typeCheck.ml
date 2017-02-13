@@ -138,7 +138,7 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
     let (t, e') = type_exp ln env e in
     (match (uop, t) with
      | (T.Not, Tbool) -> (Tbool, Uop (uop, e'))
-     | (_, t) ->
+     | (T.Not, t) ->
        type_error ln ("operator " ^ T.show_uop uop ^
                       " applied to expression of type " ^ show_t t))
   | Array es ->

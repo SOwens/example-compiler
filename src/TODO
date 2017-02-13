@@ -1,2 +1,3 @@
 Const prop for x * 2^n -> x shift n
 Do some simple register allocation
+Add OCaml warning 4, and manually annotate all of the matches where it should apply.
