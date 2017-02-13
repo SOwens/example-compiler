@@ -54,7 +54,7 @@ let type_error (ln : int option) (msg : string) : 'a =
 let add_scope (id : id) (s : scope) : id =
   match id with
   | Source (i, None) -> Source (i, Some s)
-  | Source (i, Some _) ->
+  | Source (_, Some _) ->
     raise (InternalError "scoped identifier during type checking")
   | Temp (x, y) -> Temp (x, y)
 
@@ -86,7 +86,7 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
          else
            type_error ln ("array reference with " ^ string_of_int l ^
                           " indices, expected " ^ string_of_int num_dims)
-       | t ->
+       | _ ->
          type_error ln ("attempt to index non-array variable " ^ show_id i))
   | Call (f, args) ->
     let (param_types, ret_type) =
@@ -180,8 +180,9 @@ let rec type_stmt (ln : int option) (env :env_t) (return : t) (stmt : stmt)
   | Return (Some i) ->
     let (t, i') = type_simple_ident ln env i in
     if t <> return then
-      type_error ln ("return has type " ^ show_t t ^ " in a function with
-                     return type " ^ show_t return)
+      type_error ln ("return has type " ^ show_t t ^
+                     " in a function with return type " ^
+                     show_t return)
     else
       Return (Some i')
   | Return None ->
@@ -253,7 +254,7 @@ let rec get_var_types (s : scope) (vars : var_dec list)
 
 (* Check the init expressions on a variable declaration. Return a
    scope-annotated version of the declaration. *)
-let rec type_var_dec (s : scope) (env : env_t) (dec : var_dec) : var_dec =
+let type_var_dec (s : scope) (env : env_t) (dec : var_dec) : var_dec =
   let (t, init') = type_exp dec.loc env dec.init in
   if t = source_typ_to_t dec.typ then
     { dec with var_name = add_scope dec.var_name s; init = init' }
@@ -266,7 +267,7 @@ let rec type_var_dec (s : scope) (env : env_t) (dec : var_dec) : var_dec =
 let merge_keep_first _ (x : 'a option) (y : 'a option) : 'a option =
   match (x,y) with
   | (None, None) -> None
-  | (Some x, Some y) -> Some x
+  | (Some x, Some _) -> Some x
   | (Some x, None) -> Some x
   | (None, Some y) -> Some y
 
@@ -285,9 +286,9 @@ let rec check_return_paths (stmts : stmt list) : bool =
       | Return _ -> assert false (* already checked for this case *)
       | In _ | Out _ | Assign _ -> false
       | Loc (s,_) -> check_return_paths [s]
-      | Ite (e,s1,s2) ->
+      | Ite (_,s1,s2) ->
         check_return_paths [s1] && check_return_paths [s2]
-      | DoWhile (s1, e, s2) ->
+      | DoWhile (s1, _, _) ->
         check_return_paths [s1]
       | Stmts s -> check_return_paths s
 

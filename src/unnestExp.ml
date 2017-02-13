@@ -34,7 +34,6 @@
    | Call of SourceAst.id * ae list
  *)
 
-open Util
 open SourceAst
 module T = Tokens
 
@@ -43,7 +42,7 @@ let is_atomic (e : exp) : bool =
   | Num _ -> true
   | Bool _ -> true
   | Ident (_, []) -> true
-  | Ident (_, es) -> false
+  | Ident (_, _) -> false
   | Op _ -> false
   | Uop _ -> false
   | Array _ -> false
@@ -56,12 +55,12 @@ let is_flat (e : exp) : bool =
   | Ident (_, []) -> true
   | Ident (_, [e]) -> is_atomic e
   | Ident (_, _) -> false
-  | Op (e1, op, e2) -> is_atomic e1 && is_atomic e2
-  | Uop (uop, e) -> is_atomic e
+  | Op (e1, _, e2) -> is_atomic e1 && is_atomic e2
+  | Uop (_, e) -> is_atomic e
   | Array es -> List.for_all is_atomic es
   | Call (_, es) -> List.for_all is_atomic es
 
-let rec unnest (stmts : stmt list) : stmt list =
+let unnest (stmts : stmt list) : stmt list =
 
   (* Generate unique names for temporary variables *)
   let next_ident = ref 0 in
@@ -150,7 +149,7 @@ let rec unnest (stmts : stmt list) : stmt list =
   and unnest_exp_for_test (e : exp) : stmt list * exp =
     let (s, f) = unnest_exp e in
     match f with
-    | Ident (x, [f']) ->
+    | Ident (_, [_]) ->
       let id = get_ident () in
       (s @ [Assign (id, [], f)], Ident (id, []))
     | _ -> (s, f)
@@ -184,7 +183,7 @@ let rec unnest (stmts : stmt list) : stmt list =
       List.flatten (List.map unnest_stmt s_list)
     | In id -> [In id]
     | Out id -> [Out id]
-    | Loc (stmt, int) ->
+    | Loc (stmt, _) ->
       unnest_stmt stmt
     | Return id -> [Return id]
   in

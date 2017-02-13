@@ -53,7 +53,7 @@ let analyse_block (b : basic_block) : cfg_annot =
   let rec analyse_block gen kill b =
     match b with
     | [] -> (gen, kill)
-    | AssignOp (i, a1, op, a2) :: b ->
+    | AssignOp (i, a1, _, a2) :: b ->
       analyse_block (add_gen a1 (add_gen a2 (Varset.remove i gen)))
         (Varset.add i kill)
         b
@@ -67,9 +67,9 @@ let analyse_block (b : basic_block) : cfg_annot =
       analyse_block (add_gen a1 (add_gen a2 (Varset.add i gen)))
         kill
         b
-    | Call (None, f, aes) :: b ->
+    | Call (None, _, aes) :: b ->
       analyse_block (add_gen_list aes gen) kill b
-    | Call (Some i, f, aes) :: b ->
+    | Call (Some i, _, aes) :: b ->
       analyse_block (add_gen_list aes (Varset.remove i gen)) (Varset.add i kill) b
     | BoundCheck (a1, a2) :: b ->
       analyse_block (add_gen a1 (add_gen a2 gen)) kill b
@@ -81,18 +81,18 @@ let analyse_block (b : basic_block) : cfg_annot =
 
 (* Split the annotated cfg into the predecessors of node n, and the other nodes
 *)
-let rec find_preds n cfg =
+let find_preds n cfg =
   List.partition
-    (fun (entry, annots) ->
+    (fun (entry, _) ->
        match entry.next with
        | Return _ -> false
        | Next n' ->
          n = n'
-       | Branch (i, n1, n2) ->
+       | Branch (_, n1, n2) ->
          n = n1 || n = n2)
     cfg
 
-let add_test_vars (ae1, op, ae2) vars =
+let add_test_vars (ae1, _, ae2) vars =
   let vars' =
     match ae1 with
     | Ident v -> Varset.add v vars
@@ -112,7 +112,7 @@ let init_live_exit (globals : Varset.t) (a : cfg_annot) (next : next_block)
   | Return None -> { a with live_exit = globals }
   | Return (Some i) -> { a with live_exit = Varset.add i globals }
   | Next _ -> a
-  | Branch (i, n1, n2) ->
+  | Branch (i, _, _) ->
     { a with live_exit = add_test_vars i Varset.empty }
 
 (* Do live variable analysis, returning an annotated cfg *)
@@ -153,7 +153,7 @@ let lva (globals : Varset.t) (cfg : BlockStructure.cfg) : cfg =
          whose live_exits will change *)
       let (finished', updates') =
         List.partition
-          (fun (entry, annot) -> Varset.subset live_entry annot.live_exit)
+          (fun (_, annot) -> Varset.subset live_entry annot.live_exit)
           possible_updates
       in
       (* Update the live_exits of the nodes needing updated and add them to the

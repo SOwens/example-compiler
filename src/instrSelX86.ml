@@ -138,7 +138,7 @@ let build_to_reg_op (op : Tokens.op) (r : reg) (ae : atomic_exp)
      Zmov (Zr_rm (RAX, Zr r));
      (match ae with
       | Ident v -> Zidiv (var_to_rm v)
-      | Num i ->
+      | Num _ ->
         raise (Util.InternalError "Division by immediate constant"));
      Zmov (Zr_rm (r, Zr RAX));
      Zmov (Zr_rm (RDX, Zr r_scratch2))]
@@ -272,6 +272,7 @@ let test_to_x86 ae1 op ae2 b (label : string) : instruction list =
      Zjcc (op_to_cc b op, label)]
   | (_, Ident i) ->
     let (instrs, dest_src) = rm_ae_to_dest_src (var_to_rm i) ae1 in
+    instrs @
     [Zbinop (Zcmp, dest_src);
      Zjcc (op_to_cc b (reverse_op2 op), label)]
   | (Num n1, Num n2) ->

@@ -303,7 +303,7 @@ let pp_func (fmt : F.formatter) (func : func) : unit =
 type prog = { globals : var_dec list; funcs : func list }
 
 (* Pretty-print a program *)
-let rec pp_program (fmt : F.formatter) (p : prog) : unit =
+let pp_program (fmt : F.formatter) (p : prog) : unit =
   pp_var_decs fmt p.globals;
   List.iter (pp_func fmt) p.funcs
 
@@ -332,7 +332,7 @@ let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   | (T.Ident i, ln) :: (T.Lparen, _) ::toks ->
     let (args, toks) = parse_args ln toks in
     (Call (Source (i,None), args), toks)
-  | (T.Ident i, ln) :: toks ->
+  | (T.Ident i, _) :: toks ->
     let (indices, toks) = parse_indices toks in
     (Ident (Source (i,None), indices), toks)
   | (T.Num n, _) :: toks -> (Num n, toks)
@@ -347,7 +347,7 @@ let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   | (T.Array, _) :: toks ->
     let (indices, toks) = parse_indices toks in
     (Array indices, toks)
-  | (T.Lparen, ln) :: toks ->
+  | (T.Lparen, _) :: toks ->
     (match parse_exp toks with
      | (_, []) -> eof_error "a parenthesized expression"
      | (e, (T.Rparen, _) :: toks) ->
@@ -359,7 +359,7 @@ let rec parse_atomic_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
 
 and parse_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
   match parse_atomic_exp toks with
-  | (e1, (T.Op o, ln) :: toks) ->
+  | (e1, (T.Op o, _) :: toks) ->
     let (e2, toks) = parse_atomic_exp toks in
     (Op (e1, o, e2), toks)
   | (e1, toks) -> (e1, toks)
@@ -367,7 +367,7 @@ and parse_exp (toks : T.tok_loc list) : exp * T.tok_loc list =
 (* Parse 0 or more array indices. Return them with the left over tokens. *)
 and parse_indices (toks : T.tok_loc list) : exp list * T.tok_loc list =
   match toks with
-  | (T.Lbrac, l) :: toks ->
+  | (T.Lbrac, _) :: toks ->
     (match parse_exp toks with
      | (_, []) -> eof_error "an array index"
      | (e, (T.Rbrac, _) :: toks) ->
@@ -466,7 +466,7 @@ let parse_typ (toks : T.tok_loc list) : typ * T.tok_loc list =
 let parse_param (toks : T.tok_loc list) : (id * typ) * T.tok_loc list =
   match toks with
   | [] -> eof_error "a function parameter"
-  | (T.Lparen, ln) :: (T.Ident x, _) :: (T.Colon,_) :: toks ->
+  | (T.Lparen, _) :: (T.Ident x, _) :: (T.Colon,_) :: toks ->
     (match parse_typ toks with
      | (_, []) -> eof_error "a function parameter"
      | (t, (T.Rparen, _)::toks) ->
@@ -524,7 +524,7 @@ let parse_func (toks : T.tok_loc list) : func * T.tok_loc list =
      | (params, (T.Colon, _) :: toks) ->
        if List.length params <> 0 then
          (match parse_typ toks with
-          | (t, []) -> eof_error "a function declaration"
+          | (_, []) -> eof_error "a function declaration"
           | (t, (T.Lcurly, _) :: toks) ->
             let (var_decs, toks) = parse_var_dec_list toks in
             let (stmts, toks) = parse_stmt_list toks in
@@ -545,7 +545,7 @@ let parse_func (toks : T.tok_loc list) : func * T.tok_loc list =
 
 (* Parse global variable declarations, and then function declarations until the
    end of file *)
-let rec parse_program (toks : T.tok_loc list) : prog =
+let parse_program (toks : T.tok_loc list) : prog =
   let (var_decs, toks) = parse_var_dec_list toks in
   let rec parse_funs toks =
     match toks with

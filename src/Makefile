@@ -1,8 +1,9 @@
 PACKAGES = str
+FLAGS = -bin-annot -g -principal -safe-string -strict-formats -strict-sequence -w +a-42-4
 
 FILES = util tokens sourceAst typeCheck frontEnd constProp unnestExp \
 blockStructure shrinkImmediates liveVarAnalysis regAlloc lineariseCfg x86 \
-instrSelX86 compileFunction astInterp blockInterp interp compile
+instrSelX86 compileFunction astInterp interp compile
 
 FILES_ML = $(addsuffix .ml,$(FILES))
 FILES_MLI = $(addsuffix .mli,$(FILES))
@@ -42,13 +43,13 @@ compile.native : $(FILES_CMX)
 	ocamlfind ocamlopt -linkpkg -package $(PACKAGES) $(FILES_CMX) -o $@
 
 %.cmi : %.mli
-	ocamlfind ocamlc -package $(PACKAGES) -bin-annot -o $@ -c $<
+	ocamlfind ocamlc -package $(PACKAGES) $(FLAGS) -o $@ -c $<
 
 %.cmo : %.ml
-	ocamlfind ocamlc -package $(PACKAGES) -bin-annot -o $@ -c $<
+	ocamlfind ocamlc -package $(PACKAGES) $(FLAGS) -o $@ -c $<
 
 %.cmx : %.ml
-	ocamlfind ocamlopt -package $(PACKAGES) -bin-annot -o $@ -c $<
+	ocamlfind ocamlopt -package $(PACKAGES) $(FLAGS) -o $@ -c $<
 
 .PHONY : depend clean
 

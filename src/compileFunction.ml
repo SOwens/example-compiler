@@ -19,7 +19,6 @@
 (* Compiler for a single function *)
 
 open SourceAst
-open Format
 
 (* We treat a local variable declarations as simple assignment to the variable.
 *)

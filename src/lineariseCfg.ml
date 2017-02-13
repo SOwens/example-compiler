@@ -30,7 +30,7 @@ type linear =
   | Label of string
   | Return of var option
 
-let pp_linear fmt l =
+let pp_linear (fmt : Format.formatter) (l : linear) : unit =
   match l with
   | Instr b ->
     Format.fprintf fmt "  %a@\n" pp_block_elem b
@@ -50,7 +50,7 @@ let pp_linear fmt l =
 
 type linear_list = linear list
 
-let rec pp_linear_list fmt ls =
+let rec pp_linear_list (fmt : Format.formatter) (ls : linear list) =
   match ls with
   | [] -> ()
   | x::y ->
@@ -77,7 +77,7 @@ let rec cfg_to_linear (next_block : int) (cfg : cfg_entry I.t) : linear list =
      Label (".block" ^ string_of_int b.bnum) ::
      List.map (fun x -> Instr x) b.elems @
      match b.next with
-     | Return v -> [Return v]
+     | Return v -> [(Return v : linear)]
      | Next i ->
        if (I.find i cfg).started then
          (* We've started the next block, so we'll just jump to it *)

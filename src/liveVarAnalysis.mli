@@ -16,7 +16,6 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 *)
 
-open Util
 open BlockStructure
 
 type cfg_annot = { gen : Varset.t; kill : Varset.t; live_exit : Varset.t }

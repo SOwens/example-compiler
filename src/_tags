@@ -1,3 +1,2 @@
 true : package(str)
-true : bin_annot
-true : debug
+true : bin_annot, debug, principal, safe_string, strict_formats, strict_sequence, warn(A-42-4)

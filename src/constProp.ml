@@ -19,7 +19,6 @@
 (* Do constant propagation and folding. Later compiler phases assume that no
    operation has 2 constant arguments, so this needs to be guaranteed here. *)
 
-open Util
 open SourceAst
 module T = Tokens
 
@@ -43,8 +42,8 @@ let log2 (i : int64) : int option =
 (* Decides whether evaluating an expression might have a side-effect *)
 let rec might_have_effect (e : exp) : bool =
   match e with
-  | Ident (i, []) -> false
-  | Ident (i, es) -> true (* Array bound check failure *)
+  | Ident (_, []) -> false
+  | Ident (_, _) -> true (* Array bound check failure *)
   | Num _ | Bool _ -> false
   | Op (e1, op, e2) ->
     if op = T.Div then
@@ -114,7 +113,7 @@ let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
 
      (* Div *)
      | (Num n1, T.Div, Num n2) when n2 <> 0L -> Num (Int64.div n1 n2)
-     | (Num n1, T.Div, Num 0L) ->
+     | (Num _, T.Div, Num 0L) ->
        (* This phase needs to guarantee that no operation has two constant
           arguments. It doesn't matter what the numerator is, when the
           divisor is 0, so we can just use an arbitrary variable. *)
@@ -163,13 +162,13 @@ let rec fold_exp (env : exp Idmap.t) (e : exp) : exp =
 
      (* And *)
      | (Bool true, T.And, e) | (e, T.And, Bool true) -> e
-     | (Bool false, T.And, e) -> Bool false
+     | (Bool false, T.And, _) -> Bool false
      | (e, T.And, Bool false) when not (might_have_effect e) -> Bool false
      | (e1, T.And, e2) when ok_remove_eq_exp e1 e2 -> e1
 
      (* Or *)
      | (Bool false, T.Or, e) | (e, T.Or, Bool false) -> e
-     | (Bool true, T.Or, e) -> Bool true
+     | (Bool true, T.Or, _) -> Bool true
      | (e, T.Or, Bool true) when not (might_have_effect e) -> Bool true
      | (e1, T.Or, e2) when ok_remove_eq_exp e1 e2 -> e1
 
@@ -197,7 +196,7 @@ let same_const (e1 : exp) (e2 : exp) : bool =
   | _ -> false
 
 (* If v1 and v2 contain the same constant, return it. Otherwise return None *)
-let merge_constants (id : id) (v1 : exp option) (v2 : exp option)
+let merge_constants (_ : id) (v1 : exp option) (v2 : exp option)
   : exp option =
   match (v1,v2) with
   | (Some e1, Some e2) ->
@@ -279,7 +278,7 @@ let rec prop_stmts (env : exp Idmap.t) (stmts : stmt list)
     let (env1, o1) = prop_stmt env s in
     let (env', stmts') = prop_stmts env1 stmts in
     (env', Loc (o1, ln) :: stmts')
-  | Return x :: stmts ->
+  | Return x :: _ ->
     (* We can't carry on past a return *)
     (env, [Return x])
 
@@ -292,7 +291,7 @@ and prop_stmt env (stmt : stmt) =
    known constants at the end, assuming that stmts is run in a loop body an
    unknown number of times. *)
 and prop_loop_body (env : exp Idmap.t) (stmts : stmt list) : exp Idmap.t =
-  let (env', stmts') = prop_stmts env stmts in
+  let (env', _) = prop_stmts env stmts in
   (* The next approximation of constants at the start *)
   let env'' = Idmap.merge merge_constants env env' in
   if Idmap.equal same_const env env'' then

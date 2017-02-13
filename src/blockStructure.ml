@@ -233,10 +233,10 @@ let cfg_to_graphviz fmt (cfg : cfg) : unit =
               entry;
             Format.fprintf fmt "@\n";
             match entry.next with
-            | Return v -> ()
+            | Return _ -> ()
             | Next i ->
               Format.fprintf fmt "%d->%d@\n" entry.bnum i
-            | Branch (t, i1, i2) ->
+            | Branch (_, i1, i2) ->
               Format.fprintf fmt "%d->%d[label=1]@\n" entry.bnum i1;
               Format.fprintf fmt "%d->%d[label=0]@\n" entry.bnum i2)
          cfg)
@@ -289,7 +289,7 @@ let flat_e_to_assign (x : S.id) (e : S.exp) : block_elem list =
         BoundCheck (ae, Ident tmp_var);
         get_len;
         NullCheck (id_to_var id)])
-  | S.Ident (id, _::_::_) ->
+  | S.Ident (_, _::_::_) ->
     raise (InternalError "multi-dimension array index in blockStructure")
   | S.Num n -> [AssignAtom (v, Num n)]
   | S.Bool b -> [AssignAtom (v, bool_to_num b)]
@@ -315,9 +315,9 @@ let flat_exp_to_test (e : S.exp) : test =
   match e with
   | S.Ident (id, []) ->
     (Ident (id_to_var id), Eq, Num 1L)
-  | S.Ident (id, _::_) ->
+  | S.Ident (_, _::_) ->
     raise (InternalError "array index in test position in blockStructure")
-  | S.Num n ->
+  | S.Num _ ->
     raise (InternalError "number in test position in blockStructure")
   | S.Bool b ->
     (bool_to_num b, Eq, Num 1L)
@@ -326,7 +326,7 @@ let flat_exp_to_test (e : S.exp) : test =
   | S.Uop (Tokens.Not, ae) ->
     (* !x == (x = false) *)
     (exp_to_atomic ae, Eq, Num 0L)
-  | S.Array es ->
+  | S.Array _ ->
     raise (InternalError "array alloc test in blockStructure")
   | S.Call _ ->
     raise (InternalError "function call test in blockStructure")
@@ -389,7 +389,7 @@ let build_cfg (stmts : S.stmt list) : cfg =
             NullCheck (id_to_var x)])
       in
       find_blocks block_num (new_block_elems @ block_acc) following_block s1
-    | S.Assign (x, _::_::_, e) :: s1 ->
+    | S.Assign (_, _::_::_, _) :: _ ->
       raise (InternalError "multi-dimension array index in blockStructure")
     | S.Stmts s1 :: s2 ->
       (* Treat { s1 ... sn } s1' ... sn' as though it were

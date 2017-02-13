@@ -18,9 +18,6 @@
 
 (* The main driver for the compiler executable. *)
 
-open Util
-open Format
-
 (* Command-line arguments *)
 let filename_ref = ref None;;
 let safe_ref = ref true;;
@@ -80,6 +77,8 @@ let globals =
 let functions =
   List.map (CompileFunction.compile_fun !safe_ref filename globals)
     (main_function::prog.funcs);;
+
+open Format
 
 let outfile = open_out (Filename.chop_extension filename ^ ".s");;
 let fmt = formatter_of_out_channel outfile;;

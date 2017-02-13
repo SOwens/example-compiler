@@ -20,7 +20,6 @@
    OCaml refs for mutable variables, and we represent arrays with mutable OCaml
    arrays. We also model function returns with exceptions. *)
 
-open Util
 open SourceAst
 module T = Tokens
 

@@ -27,35 +27,35 @@ open BlockStructure
 let get_vars_ae (ae : atomic_exp) (vars : Varset.t) : Varset.t =
   match ae with
   | Ident r -> Varset.add r vars
-  | Num x -> vars
+  | Num _ -> vars
 
 let get_vars_be (be : block_elem) (vars : Varset.t) : Varset.t =
   match be with
-  | AssignOp (r, ae1, op, ae2) ->
+  | AssignOp (r, ae1, _, ae2) ->
     get_vars_ae ae1 (get_vars_ae ae2 (Varset.add r vars))
   | AssignAtom (r, ae) -> get_vars_ae ae (Varset.add r vars)
   | Ld (v1, v2, ae) ->
     get_vars_ae ae (Varset.add v1 (Varset.add v2 vars))
   | St (r, ae1, ae2) ->
     get_vars_ae ae1 (get_vars_ae ae2 (Varset.add r vars))
-  | Call (None, f, aes) ->
+  | Call (None, _, aes) ->
     List.fold_right get_vars_ae aes vars
-  | Call (Some i, f, aes) ->
+  | Call (Some i, _, aes) ->
     List.fold_right get_vars_ae aes (Varset.add i vars)
   | BoundCheck (a1, a2) ->
     get_vars_ae a1 (get_vars_ae a2 vars)
   | NullCheck v ->
     Varset.add v vars
 
-let get_vars_test (ae1, op, ae2) (vars : Varset.t) : Varset.t =
+let get_vars_test (ae1, _, ae2) (vars : Varset.t) : Varset.t =
   List.fold_right get_vars_ae [ae1; ae2] vars
 
 let get_vars_nb (nb : next_block) (vars : Varset.t) : Varset.t =
   match nb with
   | Return None -> vars
   | Return (Some v) -> Varset.add v vars
-  | Next i -> vars
-  | Branch (r, t1, t2) -> get_vars_test r vars
+  | Next _ -> vars
+  | Branch (r, _, _) -> get_vars_test r vars
 
 let get_vars_block (b : cfg_entry) (vars : Varset.t) : Varset.t =
   List.fold_right get_vars_be b.elems (get_vars_nb b.next vars)
