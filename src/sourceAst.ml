@@ -461,7 +461,7 @@ let parse_typ (toks : T.tok_loc list) : typ * T.tok_loc list =
   | (t,ln) :: _ ->
     parse_error ln ("bad type, beginning with a " ^ T.show_token t)
 
-(* Convert the first funciton parameter toks into an AST. Return it with the
+(* Convert the first function parameter toks into an AST. Return it with the
    left over tokens. *)
 let parse_param (toks : T.tok_loc list) : (id * typ) * T.tok_loc list =
   match toks with
