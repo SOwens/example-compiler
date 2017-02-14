@@ -1,0 +1,70 @@
+// Quicksort
+
+let r : int = test(1)
+
+function test (i : int) : int
+{
+  let len : int = 0
+  let a : array 1 = array[0]
+  let i : int = 0
+  let y : int = 0
+  input len
+  a := array[len]
+  while i < len {
+    input y
+    a[i] := y
+    i := i + 1
+  }
+
+  i := sort(a, 0, len-1)
+
+  i := 0
+  while i < len {
+    y := a[i]
+    output y
+    i := i + 1
+  }
+  return i
+}
+
+// Partition an array between lower and upper (inclusive), so that everything
+// before (and including) the returned index is <= than the pivot and
+// everything after is >= the pivot. The return value is strictly less than
+// upper. Assume that lower < upper. This is Tony Hoare's partitioning
+// algorithm.
+function partition (a : array 1) (pivot : int) (lower : int) (upper : int) : int {
+  let temp : int = 0
+  lower := lower - 1
+  upper := upper + 1
+  do {
+    do
+      lower := lower + 1
+    while (a[lower] < pivot)
+    do
+      upper := upper - 1
+    while (a[upper] > pivot)
+    if (lower < upper) then {
+      temp := a[lower]
+      a[lower] := a[upper]
+      a[upper] := temp
+    }
+    else
+      return upper
+  } while true
+  return upper
+}
+
+// Sort the array between first and last, inclusive. Return a dummy value.
+function sort (a : array 1) (first : int) (last : int) : int {
+  let mid : int = 0
+  let temp : int = 0
+
+  if (first = last) then
+    return temp
+  else {
+    mid := partition(a, a[first], first, last)
+    temp := sort(a,first,mid)
+    temp := sort(a,mid+1,last)
+    return temp
+  }
+}
