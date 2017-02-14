@@ -186,6 +186,20 @@ let caller_restore =
    Zpop (Zr RDX);
    Zpop (Zr RCX)]
 
+let callee_save =
+  [Zpush (Zi_rm (Zr RBX));
+   Zpush (Zi_rm (Zr R12));
+   Zpush (Zi_rm (Zr R13));
+   Zpush (Zi_rm (Zr R14));
+   Zpush (Zi_rm (Zr R15))]
+
+let callee_restore =
+  [Zpop (Zr R15);
+   Zpop (Zr R14);
+   Zpop (Zr R13);
+   Zpop (Zr R12);
+   Zpop (Zr RBX)]
+
 (* The order that the calling convention puts arguments into registers *)
 let reg_list = [RDI; RSI; RDX; RCX; R8; R9]
 
@@ -364,7 +378,8 @@ let rec be_to_x86 safe be : instruction list =
     else
       []
 
-(* safe determines whether to do null and bounds checks *)
+(* Translate a function body to x86. safe determines whether to do null and
+   bounds checks *)
 let to_x86 (safe : bool) (ll : L.linear list) (num_stack : int)
   : instruction list =
   (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
@@ -374,16 +389,19 @@ let to_x86 (safe : bool) (ll : L.linear list) (num_stack : int)
     else
       num_stack + 1
   in
+  (* Setup the stack pointers *)
   Zpush (Zi_rm (Zr RBP)) ::
   Zmov (Zr_rm (RBP, Zr RSP)) ::
   Zbinop (Zsub, Zrm_i (Zr RSP, Int64.mul (Int64.of_int num_stack) 8L)) ::
+  (* Save the other callee save registers *)
+  callee_save @
   List.flatten
     (List.map
        (fun l ->
           match l with
           | L.Instr be -> be_to_x86 safe be
-          | L.Return None -> [Zleave; Zret]
-          | L.Return (Some v) -> [Zmov (Zr_rm (RAX, var_to_rm v)); Zleave; Zret]
+          | L.Return None -> callee_restore @ [Zleave; Zret]
+          | L.Return (Some v) -> callee_restore @ [Zmov (Zr_rm (RAX, var_to_rm v)); Zleave; Zret]
           | L.CJump ((ae1, op, ae2), b, s) ->
             test_to_x86 ae1 op ae2 b s
           | L.Jump s ->
