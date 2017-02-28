@@ -51,12 +51,12 @@ let compile_fun safe filename (globals : BlockStructure.Varset.t) (f : func)
   (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg; *)
   (* Print the CFG in dot format. Process the .dot file with dot -Tpdf FILENAME > FILENAME.pdf.
      dot is part of the graphviz package http://www.graphviz.org *)
-(*
+  (*
   let outfile = open_out (Filename.chop_extension filename ^ "_" ^ show_id f.fun_name ^ ".dot") in
-  let fmt = formatter_of_out_channel outfile in
-  fprintf fmt "%a" BlockStructure.cfg_to_graphviz cfg;
+  let fmt = Format.formatter_of_out_channel outfile in
+  Format.fprintf fmt "%a" BlockStructure.cfg_to_graphviz cfg;
   close_out outfile;
-   *)
+     *)
 
   let cfg' = ShrinkImmediates.shrink_imm cfg in
   (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg';*)
