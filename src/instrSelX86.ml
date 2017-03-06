@@ -385,15 +385,20 @@ let to_x86 (safe : bool) (ll : L.linear list) (num_stack : int)
   (* We have to keep RSP 16 byte aligned, add a qword if necessary *)
   let num_stack =
     if num_stack mod 2 = 0 then
-      num_stack
-    else
+      (* We need to do an odd number of pushes over all, since the call has
+         pushed rip for us. There are an even number of callee saved registers,
+         including rbp. *)
       num_stack + 1
+    else
+      num_stack
   in
-  (* Setup the stack pointers *)
-  Zpush (Zi_rm (Zr RBP)) ::
-  Zmov (Zr_rm (RBP, Zr RSP)) ::
-  Zbinop (Zsub, Zrm_i (Zr RSP, Int64.mul (Int64.of_int num_stack) 8L)) ::
-  (* Save the other callee save registers *)
+  (* Save the old base pointer *)
+  [Zpush (Zi_rm (Zr RBP))] @
+  (* Set a new base pointer *)
+  [Zmov (Zr_rm (RBP, Zr RSP))] @
+  (* Extend the stack for the local variables *)
+  [Zbinop (Zsub, Zrm_i (Zr RSP, Int64.mul (Int64.of_int num_stack) 8L))] @
+  (* Save other the callee save registers, odd number *)
   callee_save @
   List.flatten
     (List.map
@@ -401,7 +406,7 @@ let to_x86 (safe : bool) (ll : L.linear list) (num_stack : int)
           match l with
           | L.Instr be -> be_to_x86 safe be
           | L.Return None -> callee_restore @ [Zleave; Zret]
-          | L.Return (Some v) -> callee_restore @ [Zmov (Zr_rm (RAX, var_to_rm v)); Zleave; Zret]
+          | L.Return (Some v) -> Zmov (Zr_rm (RAX, var_to_rm v)) :: callee_restore @ [Zleave; Zret]
           | L.CJump ((ae1, op, ae2), b, s) ->
             test_to_x86 ae1 op ae2 b s
           | L.Jump s ->
