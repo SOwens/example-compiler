@@ -123,7 +123,7 @@ let rec type_exp (ln : int option) (env : env_t) (e : exp) : t * exp =
     let (t2, e2') = type_exp ln env e2 in
     let t =
       match (t1, op, t2) with
-      | (Tbool, (T.And | T.Or), Tbool) -> Tbool
+      | (Tbool, (T.And | T.Or | T.Eq), Tbool) -> Tbool
       | (Tint, (T.Plus | T.Minus | T.Times | T.Div | T.Lshift | T.BitOr |
                 T.BitAnd), Tint) ->
         Tint
