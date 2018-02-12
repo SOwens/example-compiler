@@ -42,13 +42,13 @@ let compile_fun safe filename (globals : BlockStructure.Varset.t) (f : func)
     f.body in
 
   let (_,opt_ast) = ConstProp.prop_stmts SourceAst.Idmap.empty ast in
-   (*printf "@\n%a@\n" SourceAst.pp_stmts opt_ast; *)
+   (*Format.printf "@\n%a@\n" SourceAst.pp_stmts opt_ast; *)
 
   let no_nest_ast = UnnestExp.unnest opt_ast in
-  (*printf "@\n%a@\n" SourceAst.pp_stmts no_nest_ast; *)
+  (*Format.printf "@\n%a@\n" SourceAst.pp_stmts no_nest_ast; *)
 
   let cfg = BlockStructure.build_cfg no_nest_ast in
-  (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg; *)
+   (*Format.printf "@\n%a@\n" BlockStructure.pp_cfg cfg; *)
   (* Print the CFG in dot format. Process the .dot file with dot -Tpdf FILENAME > FILENAME.pdf.
      dot is part of the graphviz package http://www.graphviz.org *)
   (*
@@ -59,13 +59,13 @@ let compile_fun safe filename (globals : BlockStructure.Varset.t) (f : func)
      *)
 
   let cfg' = ShrinkImmediates.shrink_imm cfg in
-  (* printf "@\n%a@\n" BlockStructure.pp_cfg cfg';*)
+  (* Format.printf "@\n%a@\n" BlockStructure.pp_cfg cfg';*)
 
   let lva_cfg0 = LiveVarAnalysis.lva globals cfg' in
-  (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg0; *)
+  (* Format.printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg0; *)
 
   let lva_cfg1 = LiveVarAnalysis.remove_unused_writes lva_cfg0 in
-  (*printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg1;*)
+  (*Format.printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg1;*)
 
 
   (* Iterate analysis for examples like this:
@@ -84,23 +84,23 @@ let compile_fun safe filename (globals : BlockStructure.Varset.t) (f : func)
   *)
 
   let lva_cfg2 = LiveVarAnalysis.lva globals (List.map fst lva_cfg1) in
-  (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg2; *)
+  (* Format.printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg2; *)
 
   let lva_cfg3 = LiveVarAnalysis.remove_unused_writes lva_cfg2 in
-  (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg3; *)
+  (* Format.printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg3; *)
 
   let lva_cfg4 = LiveVarAnalysis.lva globals (List.map fst lva_cfg3) in
-  (* printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;*)
+  (* Format.printf "@\n%a@\n" LiveVarAnalysis.pp_cfg lva_cfg4;*)
 
   let (reg_cfg, num_stack) =
     RegAlloc.reg_alloc (Util.zip (List.map fst f.params) InstrSelX86.argument_reg_numbers)
       InstrSelX86.num_regs
       (List.map fst lva_cfg4)
   in
-  (* printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg; *)
+   (* Format.printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg; *)
 
   let linear = LineariseCfg.cfg_to_linear reg_cfg in
-  (* printf "@\n%a@\n" LineariseCfg.pp_linear_list linear; *)
+  Format.printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;
 
   let x86 = InstrSelX86.to_x86 safe linear num_stack in
 
