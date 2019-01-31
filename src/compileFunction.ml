@@ -100,7 +100,7 @@ let compile_fun safe filename (globals : BlockStructure.Varset.t) (f : func)
    (* Format.printf "@\n%a@\n" BlockStructure.pp_cfg reg_cfg; *)
 
   let linear = LineariseCfg.cfg_to_linear reg_cfg in
-  Format.printf "@\n%a@\n" LineariseCfg.pp_linear_list linear;
+  (* Format.printf "@\n%a@\n" LineariseCfg.pp_linear_list linear; *)
 
   let x86 = InstrSelX86.to_x86 safe linear num_stack in
 
